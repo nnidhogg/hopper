@@ -21,9 +21,16 @@ This parsing library is actively developed and not yet feature-complete. The cor
 **lookahead**, **source location tracking**, and **structured error reporting** are stable, but higher-level
 abstractions are still evolving.
 
-As an initial application of the library, work is underway to build an **AST and parser for an Interface Definition
-Language (IDL)**. This will serve as both a **reference implementation** and a **validation** of the library’s design
-and usability.
+As initial applications of the library, work is underway on two parsers:
+
+- **`libs/idl`** — an AST and parser for a minimal subset of an Interface Definition Language (IDL), currently
+  covering struct declarations with primitive fields.
+- **`libs/cpp`** — a recursive-descent, precedence-climbing parser for a subset of C++ **expressions**: literals,
+  identifiers, parenthesized subexpressions, unary operators, the standard left-associative binary precedence ladder
+  (multiplicative, additive, relational, equality, logical-and, logical-or), and the right-associative ternary
+  conditional. Declarations, statements, and postfix operators (calls, `.`, `->`, `[]`) are not covered yet.
+
+These serve as both **reference implementations** and a **validation** of the library's design and usability.
 
 Breaking changes may occur while the API is being refined.
 
