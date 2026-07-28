@@ -1,9 +1,9 @@
-#ifndef PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKENS_HPP
-#define PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKENS_HPP
+#ifndef HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKENS_HPP
+#define HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKENS_HPP
 
 #include <cstdint>
 
-namespace parser::idl
+namespace hopper::idl
 {
 enum class Token_kind : uint8_t
 {
@@ -73,6 +73,6 @@ enum class Token_kind : uint8_t
     Multi_line_comment,
 };
 
-} // namespace parser::idl
+} // namespace hopper::idl
 
-#endif // PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKENS_HPP
+#endif // HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKENS_HPP

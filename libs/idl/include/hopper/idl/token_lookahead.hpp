@@ -1,13 +1,13 @@
-#ifndef PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOOKAHEAD_HPP
-#define PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOOKAHEAD_HPP
+#ifndef HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOOKAHEAD_HPP
+#define HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOOKAHEAD_HPP
 
-#include <lexer/tools/tokenizer/token.hpp>
+#include <munch/tools/tokenizer/token.hpp>
 #include <optional>
 
 #include "token_location.hpp"
 #include "tokens.hpp"
 
-namespace parser::idl
+namespace hopper::idl
 {
 /**
  * @brief Holds the currently buffered (lookahead) token and its source location.
@@ -24,7 +24,7 @@ public:
      * Represents a lexical token classified by `Token_kind`, containing both the token
      * kind and its corresponding lexeme.
      */
-    using Token_t = lexer::tools::tokenizer::Token<Token_kind>;
+    using Token_t = munch::tools::tokenizer::Token<Token_kind>;
 
     /**
      * @brief Constructs an empty lookahead state.
@@ -67,6 +67,6 @@ private:
     Token_location location_;
 };
 
-} // namespace parser::idl
+} // namespace hopper::idl
 
-#endif // PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOOKAHEAD_HPP
+#endif // HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOOKAHEAD_HPP

@@ -1,13 +1,13 @@
-#ifndef PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_READER_HPP
-#define PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_READER_HPP
+#ifndef HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_READER_HPP
+#define HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_READER_HPP
 
 #include <filesystem>
-#include <lexer/tools/tokenizer/tokenizer.hpp>
+#include <munch/tools/tokenizer/tokenizer.hpp>
 
 #include "token_lookahead.hpp"
 #include "tokens.hpp"
 
-namespace parser::idl
+namespace hopper::idl
 {
 class Token_reader
 {
@@ -18,20 +18,20 @@ public:
      * Holds a `tokenizer::Token<T>` on success, `std::nullopt` on end of input,
      * or an `tokenizer::Error` on failure.
      */
-    using Result_t = lexer::tools::tokenizer::Tokenizer::Result_t<Token_kind>;
+    using Result_t = munch::tools::tokenizer::Tokenizer::Result_t<Token_kind>;
 
     /**
      * @brief Construct a token stream from a lexer.
      * @param lexer Lexer used to recognize tokens.
      */
-    explicit Token_reader(lexer::core::Lexer lexer);
+    explicit Token_reader(munch::core::Lexer lexer);
 
     /**
      * @brief Construct a token stream from a lexer and an input string held in memory.
      * @param lexer Lexer used to recognize tokens.
      * @param input Input text to tokenize
      */
-    explicit Token_reader(lexer::core::Lexer lexer, const std::string& input);
+    explicit Token_reader(munch::core::Lexer lexer, const std::string& input);
 
     /**
      * @brief Construct a token stream by reading the contents of a file.
@@ -40,7 +40,7 @@ public:
      *
      * The file is read in binary mode into an internal std::string using the private read() helper.
      */
-    explicit Token_reader(lexer::core::Lexer lexer, const std::filesystem::path& file);
+    explicit Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file);
 
     /**
      * @brief Replace the current input and reset tokenization state.
@@ -120,11 +120,11 @@ private:
      */
     static std::string read(const std::filesystem::path& file);
 
-    lexer::tools::tokenizer::Tokenizer tokenizer_;
+    munch::tools::tokenizer::Tokenizer tokenizer_;
 
     Token_lookahead lookahead_;
 };
 
-} // namespace parser::idl
+} // namespace hopper::idl
 
-#endif // PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_READER_HPP
+#endif // HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_READER_HPP

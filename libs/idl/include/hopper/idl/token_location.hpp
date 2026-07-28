@@ -1,12 +1,12 @@
-#ifndef PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOCATION_HPP
-#define PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOCATION_HPP
+#ifndef HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOCATION_HPP
+#define HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOCATION_HPP
 
 #include <cstddef>
 #include <string_view>
 
 #include "tokens.hpp"
 
-namespace parser::idl
+namespace hopper::idl
 {
 /**
  * @brief Tracks the current position within the input source.
@@ -61,6 +61,6 @@ private:
     std::size_t offset_;
 };
 
-} // namespace parser::idl
+} // namespace hopper::idl
 
-#endif // PARSER_LIBS_IDL_INCLUDE_PARSER_IDL_TOKEN_LOCATION_HPP
+#endif // HOPPER_LIBS_IDL_INCLUDE_HOPPER_IDL_TOKEN_LOCATION_HPP
