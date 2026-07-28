@@ -9,6 +9,7 @@
 #include <munch/regex/any_of.hpp>
 #include <munch/regex/choice.hpp>
 #include <munch/regex/concat.hpp>
+#include <munch/regex/patterns.hpp>
 #include <munch/regex/repeat.hpp>
 #include <munch/regex/text.hpp>
 #include <munch/tools/tokenizer/tokenizer.hpp>
@@ -27,32 +28,11 @@ namespace
 class Token_reader_test : public testing::Test
 {
 public:
-    static auto identifier_regex()
-    {
-        const auto identifier{concat(any_of(Set::alpha() + '_'), kleene(any_of(Set::alphanum() + '_')))};
-
-        return identifier;
-    }
-
-    static auto integer_literal_regex()
-    {
-        const auto integer_literal{plus(any_of(Set::digits()))};
-
-        return integer_literal;
-    }
-
     static auto string_literal_regex()
     {
         const auto string_literal{concat(text("\""), kleene(any_of(Set::printable())), text("\""))};
 
         return string_literal;
-    }
-
-    static auto fixed_point_literal_regex()
-    {
-        const auto fixed_point_literal{concat(plus(any_of(Set::digits())), text("."), plus(any_of(Set::digits())))};
-
-        return fixed_point_literal;
     }
 
     static auto floating_point_literal_regex()
@@ -114,11 +94,11 @@ Lexer build_lexer()
     builder.add_token(text("char"), Token_kind::Keyword_char, 1);
     builder.add_token(text("string"), Token_kind::Keyword_string, 1);
 
-    builder.add_token(Token_reader_test::identifier_regex(), Token_kind::Identifier, 4);
+    builder.add_token(patterns::identifier(), Token_kind::Identifier, 4);
 
-    builder.add_token(Token_reader_test::integer_literal_regex(), Token_kind::Integer_literal, 2);
+    builder.add_token(patterns::decimal_integer(), Token_kind::Integer_literal, 2);
     builder.add_token(Token_reader_test::string_literal_regex(), Token_kind::String_literal, 2);
-    builder.add_token(Token_reader_test::fixed_point_literal_regex(), Token_kind::Fixed_point_literal, 2);
+    builder.add_token(patterns::decimal_float(), Token_kind::Fixed_point_literal, 2);
     builder.add_token(Token_reader_test::floating_point_literal_regex(), Token_kind::Floating_point_literal, 3);
 
     builder.add_token(Token_reader_test::single_line_comment_regex(), Token_kind::Single_line_comment, 0);
