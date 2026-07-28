@@ -1,8 +1,8 @@
-#include "parser/idl/token_lookahead.hpp"
+#include "hopper/idl/token_lookahead.hpp"
 
 #include <utility>
 
-namespace parser::idl
+namespace hopper::idl
 {
 const std::optional<Token_lookahead::Token_t>& Token_lookahead::token() const noexcept
 {
@@ -33,4 +33,4 @@ void Token_lookahead::advance(Token_kind kind, std::string_view lexeme) noexcept
     location_.advance(kind, lexeme);
 }
 
-} // namespace parser::idl
+} // namespace hopper::idl

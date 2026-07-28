@@ -1,8 +1,8 @@
-#include "parser/idl/token_location.hpp"
+#include "hopper/idl/token_location.hpp"
 
 #include <algorithm>
 
-namespace parser::idl
+namespace hopper::idl
 {
 Token_location::Token_location() : line_{1}, column_{1}, offset_{0}
 {}
@@ -41,4 +41,4 @@ void Token_location::advance(const Token_kind kind, const std::string_view lexem
     offset_ += lexeme.size();
 }
 
-} // namespace parser::idl
+} // namespace hopper::idl

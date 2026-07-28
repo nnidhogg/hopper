@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0097 NEW)
-project(parser_idl)
+project(hopper_idl)
 
 add_library(${PROJECT_NAME}
         src/token_location.cpp
@@ -15,10 +15,10 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
-        lexer
+        munch
 )
 
-if (PARSER_BUILD_TESTS)
+if (HOPPER_BUILD_TESTS)
     add_executable(${PROJECT_NAME}_tests
             tests/token_reader_test.cpp
     )
@@ -26,7 +26,7 @@ if (PARSER_BUILD_TESTS)
     target_link_libraries(${PROJECT_NAME}_tests
             PRIVATE
             ${PROJECT_NAME}
-            lexer
+            munch
             gtest_main
     )
 

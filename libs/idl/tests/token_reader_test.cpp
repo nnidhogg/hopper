@@ -1,26 +1,26 @@
-#include "parser/idl/token_reader.hpp"
+#include "hopper/idl/token_reader.hpp"
 
 #include <gtest/gtest.h>
 
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <lexer/core/builder.hpp>
-#include <lexer/regex/any_of.hpp>
-#include <lexer/regex/choice.hpp>
-#include <lexer/regex/concat.hpp>
-#include <lexer/regex/repeat.hpp>
-#include <lexer/regex/text.hpp>
-#include <lexer/tools/tokenizer/tokenizer.hpp>
+#include <munch/core/builder.hpp>
+#include <munch/regex/any_of.hpp>
+#include <munch/regex/choice.hpp>
+#include <munch/regex/concat.hpp>
+#include <munch/regex/repeat.hpp>
+#include <munch/regex/text.hpp>
+#include <munch/tools/tokenizer/tokenizer.hpp>
 #include <string>
 
-#include "parser/idl/token_reader.hpp"
-#include "parser/idl/tokens.hpp"
+#include "hopper/idl/token_reader.hpp"
+#include "hopper/idl/tokens.hpp"
 
-using namespace lexer::core;
-using namespace lexer::regex;
+using namespace munch::core;
+using namespace munch::regex;
 
-using namespace parser::idl;
+using namespace hopper::idl;
 
 namespace
 {
@@ -145,12 +145,9 @@ TEST_F(Token_reader_test, Tokenize_from_string_stream)
 
     const auto advance = [&reader](const Token_kind expect_kind, const std::string_view expect_lexeme) {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), expect_kind);
         EXPECT_EQ(token.lexeme(), expect_lexeme);
     };
@@ -167,11 +164,7 @@ TEST_F(Token_reader_test, Tokenize_from_string_stream)
         advance(Token_kind::Floating_point_literal, "5.0e+1");
         advance(Token_kind::Multi_line_comment, "/* block */");
 
-        const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
-
-        const auto& optional{expected.value()};
-        EXPECT_FALSE(optional.has_value()); // EOF
+        EXPECT_TRUE(reader.next().end_of_input());
     };
 
     evaluate();
@@ -203,12 +196,9 @@ TEST_F(Token_reader_test, Tokenize_from_file_stream)
 
     const auto advance = [&reader](const Token_kind expect_kind, const std::string_view expect_lexeme) {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), expect_kind);
         EXPECT_EQ(token.lexeme(), expect_lexeme);
     };
@@ -225,11 +215,7 @@ TEST_F(Token_reader_test, Tokenize_from_file_stream)
         advance(Token_kind::Floating_point_literal, "5.0e+1");
         advance(Token_kind::Multi_line_comment, "/* block */");
 
-        const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
-
-        const auto& optional{expected.value()};
-        EXPECT_FALSE(optional.has_value()); // EOF
+        EXPECT_TRUE(reader.next().end_of_input());
     };
 
     evaluate();
@@ -270,7 +256,7 @@ TEST_F(Token_reader_test, Unknown_character_reports_position)
         Token_reader reader{std::move(lexer), input};
 
         const auto expected{reader.next()};
-        ASSERT_FALSE(expected.has_value());
+        ASSERT_TRUE(expected.has_error());
 
         const auto& error{expected.error()};
         EXPECT_FALSE(error.message().empty());
@@ -284,10 +270,10 @@ TEST_F(Token_reader_test, Unknown_character_reports_position)
 
         Token_reader reader{std::move(lexer), input};
 
-        ASSERT_TRUE(reader.next().has_value()); // First part will be recognized
+        ASSERT_TRUE(reader.next().has_token()); // First part will be recognized
 
         const auto expected{reader.next()};
-        ASSERT_FALSE(expected.has_value());
+        ASSERT_TRUE(expected.has_error());
 
         const auto& error{expected.error()};
         EXPECT_FALSE(error.message().empty());
@@ -301,10 +287,10 @@ TEST_F(Token_reader_test, Unknown_character_reports_position)
 
         Token_reader reader{std::move(lexer), input};
 
-        ASSERT_TRUE(reader.next().has_value()); // First part will be recognized
+        ASSERT_TRUE(reader.next().has_token()); // First part will be recognized
 
         const auto expected{reader.next()};
-        ASSERT_FALSE(expected.has_value());
+        ASSERT_TRUE(expected.has_error());
 
         const auto& error{expected.error()};
         EXPECT_FALSE(error.message().empty());
@@ -322,12 +308,9 @@ TEST_F(Token_reader_test, CRLF_is_normalized_and_locations_advance)
 
     const auto advance = [&reader](const Token_kind expect_kind, const std::string_view expect_lexeme) {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), expect_kind);
         EXPECT_EQ(token.lexeme(), expect_lexeme);
     };
@@ -347,11 +330,7 @@ TEST_F(Token_reader_test, CRLF_is_normalized_and_locations_advance)
     EXPECT_EQ(reader.location().column(), 5); // after '1234'
     EXPECT_EQ(reader.location().offset(), 14);
 
-    const auto expected{reader.next()};
-    ASSERT_TRUE(expected.has_value());
-
-    const auto& optional{expected.value()};
-    EXPECT_FALSE(optional.has_value()); // EOF
+    EXPECT_TRUE(reader.next().end_of_input());
 }
 
 TEST_F(Token_reader_test, Peek_is_stable_until_next)
@@ -364,24 +343,18 @@ TEST_F(Token_reader_test, Peek_is_stable_until_next)
 
     const auto advance = [&reader](const Token_kind expect_kind, const std::string_view expect_lexeme) {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), expect_kind);
         EXPECT_EQ(token.lexeme(), expect_lexeme);
     };
 
     const auto peek = [&reader](const Token_kind expect_kind, const std::string_view expect_lexeme) {
         const auto expected{reader.peek()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), expect_kind);
         EXPECT_EQ(token.lexeme(), expect_lexeme);
     };
@@ -392,11 +365,7 @@ TEST_F(Token_reader_test, Peek_is_stable_until_next)
     peek(Token_kind::Identifier, "x");
     advance(Token_kind::Identifier, "x");
 
-    const auto expected{reader.next()};
-    ASSERT_TRUE(expected.has_value());
-
-    const auto& optional{expected.value()};
-    EXPECT_FALSE(optional.has_value()); // EOF
+    EXPECT_TRUE(reader.next().end_of_input());
 }
 
 TEST_F(Token_reader_test, Next_is_idempotent_at_eof)
@@ -409,23 +378,16 @@ TEST_F(Token_reader_test, Next_is_idempotent_at_eof)
 
     {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), Token_kind::Keyword_boolean);
         EXPECT_EQ(token.lexeme(), "boolean");
     }
 
     for (int i = 0; i < 3; ++i)
     {
-        const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
-
-        const auto& optional{expected.value()};
-        EXPECT_FALSE(optional.has_value()); // EOF
+        EXPECT_TRUE(reader.next().end_of_input());
     }
 }
 
@@ -439,12 +401,9 @@ TEST_F(Token_reader_test, Multiline_comment_updates_location)
 
     {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), Token_kind::Multi_line_comment);
         EXPECT_EQ(token.lexeme(), "/* a\nb\nc */");
 
@@ -456,12 +415,9 @@ TEST_F(Token_reader_test, Multiline_comment_updates_location)
 
     {
         const auto expected{reader.next()};
-        ASSERT_TRUE(expected.has_value());
+        ASSERT_TRUE(expected.has_token());
 
-        const auto& optional{expected.value()};
-        ASSERT_TRUE(optional.has_value());
-
-        const auto& token{optional.value()};
+        const auto& token{expected.token()};
         EXPECT_EQ(token.kind(), Token_kind::Identifier);
         EXPECT_EQ(token.lexeme(), "x");
 

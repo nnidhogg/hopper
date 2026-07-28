@@ -1,17 +1,17 @@
-#include "parser/idl/token_reader.hpp"
+#include "hopper/idl/token_reader.hpp"
 
 #include <fstream>
 
-namespace parser::idl
+namespace hopper::idl
 {
-Token_reader::Token_reader(lexer::core::Lexer lexer) : tokenizer_{std::move(lexer)}
+Token_reader::Token_reader(munch::core::Lexer lexer) : tokenizer_{std::move(lexer)}
 {}
 
-Token_reader::Token_reader(lexer::core::Lexer lexer, const std::string& input)
+Token_reader::Token_reader(munch::core::Lexer lexer, const std::string& input)
     : tokenizer_{std::move(lexer), normalize(input)}
 {}
 
-Token_reader::Token_reader(lexer::core::Lexer lexer, const std::filesystem::path& file)
+Token_reader::Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file)
     : tokenizer_{std::move(lexer), normalize(file)}
 {}
 
@@ -38,28 +38,21 @@ void Token_reader::reset() noexcept
 
 Token_reader::Result_t Token_reader::peek()
 {
-    if (lookahead_.token())
+    if (const auto& token = lookahead_.token(); token)
     {
-        return lookahead_.token();
+        return *token;
     }
 
     for (;;)
     {
-        const auto expected{tokenizer_.next<Token_kind>()};
+        const auto result{tokenizer_.next<Token_kind>()};
 
-        if (!expected)
+        if (!result.has_token())
         {
-            return expected;
+            return result;
         }
 
-        const auto& optional{expected.value()};
-
-        if (!optional)
-        {
-            return std::nullopt;
-        }
-
-        const auto& token{optional.value()};
+        const auto& token{result.token()};
 
         lookahead_.advance(token.kind(), token.lexeme());
 
@@ -70,25 +63,18 @@ Token_reader::Result_t Token_reader::peek()
             continue;
         }
 
-        return lookahead_.token();
+        return *lookahead_.token();
     }
 }
 
 Token_reader::Result_t Token_reader::next()
 {
-    const auto expected{peek()};
-
-    if (!expected)
+    if (const auto expected{peek()}; !expected.has_token())
     {
         return expected;
     }
 
-    if (const auto& optional{expected.value()}; !optional)
-    {
-        return std::nullopt;
-    }
-
-    return lookahead_.consume();
+    return *lookahead_.consume();
 }
 
 const Token_location& Token_reader::location() const noexcept
@@ -142,4 +128,4 @@ std::string Token_reader::read(const std::filesystem::path& file)
     throw std::runtime_error("Token_reader: cannot open file: " + file.string());
 }
 
-} // namespace parser::idl
+} // namespace hopper::idl

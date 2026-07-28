@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(parser)
+project(hopper)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -12,8 +12,8 @@ add_compile_options(
         $<$<CONFIG:Release>:-O2>
 )
 
-option(PARSER_BUILD_TESTS "Build tests for parser" ON)
-if (PARSER_BUILD_TESTS)
+option(HOPPER_BUILD_TESTS "Build tests for hopper" ON)
+if (HOPPER_BUILD_TESTS)
     enable_testing()
 endif ()
 
@@ -26,5 +26,5 @@ add_library(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
         INTERFACE
-        lexer
+        munch
 )
