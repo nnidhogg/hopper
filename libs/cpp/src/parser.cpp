@@ -3,6 +3,7 @@
 #include <charconv>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace hopper::cpp
 {
@@ -284,7 +285,84 @@ ast::Expr Parser::parse_unary()
         return make_unary(ast::Unary_op::Not, parse_unary());
     }
 
-    return parse_primary();
+    return parse_postfix();
+}
+
+ast::Expr Parser::parse_postfix()
+{
+    auto expr{parse_primary()};
+
+    for (;;)
+    {
+        if (accept(Token_kind::Left_paren))
+        {
+            std::vector<ast::Expr> arguments;
+
+            if (!check(Token_kind::Right_paren))
+            {
+                // Real C++ takes assignment-expressions here; simplified to parse_ternary() since this grammar has
+                // no assignment.
+                arguments.push_back(parse_ternary());
+
+                while (accept(Token_kind::Comma))
+                {
+                    arguments.push_back(parse_ternary());
+                }
+            }
+
+            expect(Token_kind::Right_paren, "')' to close the argument list");
+
+            expr = {.node = ast::Call{
+                            .callee = std::make_unique<ast::Expr>(std::move(expr)),
+                            .arguments = std::move(arguments),
+                    }};
+        }
+        else if (accept(Token_kind::Left_bracket))
+        {
+            auto index{parse_ternary()};
+
+            expect(Token_kind::Right_bracket, "']' to close the subscript");
+
+            expr = {.node = ast::Subscript{
+                            .object = std::make_unique<ast::Expr>(std::move(expr)),
+                            .index = std::make_unique<ast::Expr>(std::move(index)),
+                    }};
+        }
+        else if (accept(Token_kind::Dot))
+        {
+            const auto member{expect(Token_kind::Identifier, "a member name after '.'")};
+
+            expr = {.node = ast::Member{
+                            .op = ast::Member_op::Dot,
+                            .object = std::make_unique<ast::Expr>(std::move(expr)),
+                            .member = std::string{member.lexeme()},
+                    }};
+        }
+        else if (accept(Token_kind::Arrow))
+        {
+            const auto member{expect(Token_kind::Identifier, "a member name after '->'")};
+
+            expr = {.node = ast::Member{
+                            .op = ast::Member_op::Arrow,
+                            .object = std::make_unique<ast::Expr>(std::move(expr)),
+                            .member = std::string{member.lexeme()},
+                    }};
+        }
+        else if (accept(Token_kind::Plus_plus))
+        {
+            expr = {.node = ast::Postfix{.op = ast::Postfix_op::Increment,
+                                          .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+        }
+        else if (accept(Token_kind::Minus_minus))
+        {
+            expr = {.node = ast::Postfix{.op = ast::Postfix_op::Decrement,
+                                          .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+        }
+        else
+        {
+            return expr;
+        }
+    }
 }
 
 ast::Expr Parser::parse_primary()

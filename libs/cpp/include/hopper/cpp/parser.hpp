@@ -17,10 +17,10 @@ namespace hopper::cpp
 /**
  * @brief Recursive-descent, precedence-climbing parser for a subset of C++ expressions.
  *
- * Covers primary expressions (literals, identifiers, parenthesized subexpressions), unary `+`/`-`/`!`, the
- * multiplicative/additive/relational/equality/logical-and/logical-or binary ladder (all left-associative), and the
- * ternary conditional (right-associative). Assignment, postfix operators (calls, `.`, `->`, `[]`), casts, and
- * bitwise/shift operators are not covered yet.
+ * Covers primary expressions (literals, identifiers, parenthesized subexpressions), postfix operators (calls,
+ * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`, the multiplicative/additive/relational/equality/logical-and/
+ * logical-or binary ladder (all left-associative), and the ternary conditional (right-associative). Assignment,
+ * casts, and bitwise/shift operators are not covered yet.
  */
 class Parser
 {
@@ -93,6 +93,7 @@ private:
     [[nodiscard]] ast::Expr parse_additive();
     [[nodiscard]] ast::Expr parse_multiplicative();
     [[nodiscard]] ast::Expr parse_unary();
+    [[nodiscard]] ast::Expr parse_postfix();
     [[nodiscard]] ast::Expr parse_primary();
 
     Token_reader reader_;

@@ -62,6 +62,32 @@ std::string operator_symbol(const ast::Unary_op op)
     return "?";
 }
 
+std::string operator_symbol(const ast::Postfix_op op)
+{
+    switch (op)
+    {
+    case ast::Postfix_op::Increment:
+        return "++";
+    case ast::Postfix_op::Decrement:
+        return "--";
+    }
+
+    return "?";
+}
+
+std::string operator_symbol(const ast::Member_op op)
+{
+    switch (op)
+    {
+    case ast::Member_op::Dot:
+        return ".";
+    case ast::Member_op::Arrow:
+        return "->";
+    }
+
+    return "?";
+}
+
 // Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly
 // in the expected string rather than in a deeply nested chain of std::get<> assertions.
 std::string to_string(const ast::Expr& expr)
@@ -89,6 +115,29 @@ std::string to_string(const ast::Expr& expr)
                 else if constexpr (std::is_same_v<Node_t, ast::Unary>)
                 {
                     return "(" + operator_symbol(node.op) + to_string(*node.operand) + ")";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Postfix>)
+                {
+                    return "(" + to_string(*node.operand) + operator_symbol(node.op) + ")";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Call>)
+                {
+                    std::string arguments;
+
+                    for (const auto& argument : node.arguments)
+                    {
+                        arguments += (arguments.empty() ? "" : ",") + to_string(argument);
+                    }
+
+                    return to_string(*node.callee) + "(" + arguments + ")";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Member>)
+                {
+                    return "(" + to_string(*node.object) + operator_symbol(node.op) + node.member + ")";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Subscript>)
+                {
+                    return "(" + to_string(*node.object) + "[" + to_string(*node.index) + "])";
                 }
                 else if constexpr (std::is_same_v<Node_t, ast::Binary>)
                 {
@@ -191,13 +240,135 @@ TEST(Parser_test, Unary_operators)
 
 TEST(Parser_test, Unary_chains)
 {
-    EXPECT_EQ(to_string(parse("--5")), "(-(-5))");
+    // A space is required: "--5" is one Minus_minus token via maximal munch (see Maximal_munch_prefers_the_longest_
+    // operator_token below), not two Minus tokens.
+    EXPECT_EQ(to_string(parse("- -5")), "(-(-5))");
     EXPECT_EQ(to_string(parse("!!true")), "(!(!true))");
 }
 
 TEST(Parser_test, Unary_binds_tighter_than_multiplicative)
 {
     EXPECT_EQ(to_string(parse("-2 * 3")), "((-2)*3)");
+}
+
+TEST(Parser_test, Maximal_munch_prefers_the_longest_operator_token)
+{
+    // "--5" lexes as a single Minus_minus token followed by "5", exactly as in real C++ (where this is the classic
+    // reason "a---b" means "a-- -b", not "a - --b"). There is no prefix -- in this grammar, so it's a syntax error.
+    EXPECT_THROW(parse("--5"), std::runtime_error);
+}
+
+TEST(Parser_test, Call_with_no_arguments)
+{
+    EXPECT_EQ(to_string(parse("f()")), "f()");
+}
+
+TEST(Parser_test, Call_with_one_argument)
+{
+    EXPECT_EQ(to_string(parse("f(1)")), "f(1)");
+}
+
+TEST(Parser_test, Call_with_several_arguments)
+{
+    EXPECT_EQ(to_string(parse("f(1, 2, 3)")), "f(1,2,3)");
+}
+
+TEST(Parser_test, Call_arguments_are_full_expressions)
+{
+    EXPECT_EQ(to_string(parse("f(1 + 2, x < y)")), "f((1+2),(x<y))");
+}
+
+TEST(Parser_test, Nested_calls)
+{
+    EXPECT_EQ(to_string(parse("f(g(1))")), "f(g(1))");
+}
+
+TEST(Parser_test, Calls_chain_left_to_right)
+{
+    // A call on the result of a call, e.g. a callback factory: get_callback()().
+    EXPECT_EQ(to_string(parse("get_callback()()")), "get_callback()()");
+}
+
+TEST(Parser_test, Member_access)
+{
+    EXPECT_EQ(to_string(parse("object.field")), "(object.field)");
+}
+
+TEST(Parser_test, Arrow_member_access)
+{
+    EXPECT_EQ(to_string(parse("pointer->field")), "(pointer->field)");
+}
+
+TEST(Parser_test, Member_access_chains)
+{
+    EXPECT_EQ(to_string(parse("a.b.c")), "((a.b).c)");
+    EXPECT_EQ(to_string(parse("a->b->c")), "((a->b)->c)");
+    EXPECT_EQ(to_string(parse("a->b.c")), "((a->b).c)");
+}
+
+TEST(Parser_test, Method_call)
+{
+    EXPECT_EQ(to_string(parse("object.method(1, 2)")), "(object.method)(1,2)");
+}
+
+TEST(Parser_test, Subscript)
+{
+    EXPECT_EQ(to_string(parse("array[0]")), "(array[0])");
+}
+
+TEST(Parser_test, Subscript_index_is_a_full_expression)
+{
+    EXPECT_EQ(to_string(parse("array[i + 1]")), "(array[(i+1)])");
+}
+
+TEST(Parser_test, Subscript_chains)
+{
+    EXPECT_EQ(to_string(parse("matrix[i][j]")), "((matrix[i])[j])");
+}
+
+TEST(Parser_test, Postfix_increment_and_decrement)
+{
+    EXPECT_EQ(to_string(parse("x++")), "(x++)");
+    EXPECT_EQ(to_string(parse("x--")), "(x--)");
+}
+
+TEST(Parser_test, Postfix_binds_tighter_than_unary)
+{
+    // -x++ means -(x++), not (-x)++.
+    EXPECT_EQ(to_string(parse("-x++")), "(-(x++))");
+}
+
+TEST(Parser_test, Postfix_binds_tighter_than_multiplicative)
+{
+    EXPECT_EQ(to_string(parse("x++ * 2")), "((x++)*2)");
+}
+
+TEST(Parser_test, Mixed_postfix_chain)
+{
+    // a.b -> (a.b); [0] -> ((a.b)[0]); (1) -> ((a.b)[0])(1) (Call doesn't add its own parens); .c -> the whole thing
+    // wrapped again by the outer Member.
+    EXPECT_EQ(to_string(parse("a.b[0](1).c")), "(((a.b)[0])(1).c)");
+}
+
+TEST(Parser_test, Throws_on_unclosed_call)
+{
+    EXPECT_THROW(parse("f(1, 2"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_missing_argument_after_comma)
+{
+    EXPECT_THROW(parse("f(1,)"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_unclosed_subscript)
+{
+    EXPECT_THROW(parse("array[0"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_missing_member_name)
+{
+    EXPECT_THROW(parse("object."), std::runtime_error);
+    EXPECT_THROW(parse("object.1"), std::runtime_error);
 }
 
 TEST(Parser_test, Relational_and_equality)

@@ -21,8 +21,8 @@ public:
     /**
      * @brief Standard token stream result type.
      *
-     * Holds a `tokenizer::Token<T>` on success, `std::nullopt` on end of input,
-     * or an `tokenizer::Error` on failure.
+     * A three-state sum type: holds a `tokenizer::Token<T>` on success, a `tokenizer::End_of_input` marker once the
+     * input is exhausted, or a `tokenizer::Error` on a lexical failure.
      */
     using Result_t = munch::tools::tokenizer::Tokenizer::Result_t<Token_kind>;
 
@@ -35,7 +35,7 @@ public:
     /**
      * @brief Construct a token stream from a lexer and an input string held in memory.
      * @param lexer Lexer used to recognize tokens.
-     * @param input Input text to tokenize
+     * @param input Input text to tokenize.
      */
     explicit Token_reader(munch::core::Lexer lexer, const std::string& input);
 
@@ -66,16 +66,16 @@ public:
     /**
      * @brief Look at the next token without consuming it.
      *
-     * Returns a `tokenizer::Token<T>` on success, `std::nullopt` at end of input,
-     * or an `tokenizer::Error` if a lexical issue occurs.
+     * Returns a `tokenizer::Token<T>` on success, a `tokenizer::End_of_input` marker at end of input,
+     * or a `tokenizer::Error` if a lexical issue occurs.
      */
     [[nodiscard]] Result_t peek();
 
     /**
      * @brief Retrieve the next token from the stream.
      *
-     * Returns a `tokenizer::Token<T>` on success, `std::nullopt` at end of input,
-     * or an `tokenizer::Error` if a lexical issue occurs.
+     * Returns a `tokenizer::Token<T>` on success, a `tokenizer::End_of_input` marker at end of input,
+     * or a `tokenizer::Error` if a lexical issue occurs.
      */
     [[nodiscard]] Result_t next();
 

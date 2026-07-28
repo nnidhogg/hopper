@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace hopper::cpp::ast
 {
@@ -37,6 +38,24 @@ enum class Binary_op
     Not_equal,
     Logical_and,
     Logical_or,
+};
+
+/**
+ * @brief A postfix operator applied to a single operand: `x++` or `x--`.
+ */
+enum class Postfix_op
+{
+    Increment,
+    Decrement,
+};
+
+/**
+ * @brief How a member is accessed: `object.member` or `object->member`.
+ */
+enum class Member_op
+{
+    Dot,
+    Arrow,
 };
 
 /**
@@ -81,6 +100,43 @@ struct Unary
 };
 
 /**
+ * @brief A postfix operator applied to a single operand, e.g. `x++`.
+ */
+struct Postfix
+{
+    Postfix_op op;
+    std::unique_ptr<Expr> operand;
+};
+
+/**
+ * @brief A function call, e.g. `f(a, b)`. `callee` need not be a `Name` (e.g. `get_callback()()`).
+ */
+struct Call
+{
+    std::unique_ptr<Expr> callee;
+    std::vector<Expr> arguments;
+};
+
+/**
+ * @brief A member access, e.g. `object.member` or `pointer->member`.
+ */
+struct Member
+{
+    Member_op op;
+    std::unique_ptr<Expr> object;
+    std::string member;
+};
+
+/**
+ * @brief An array subscript, e.g. `array[index]`.
+ */
+struct Subscript
+{
+    std::unique_ptr<Expr> object;
+    std::unique_ptr<Expr> index;
+};
+
+/**
  * @brief An infix operator applied to two operands, e.g. `a + b`.
  *
  * Left-associative for every operator in this grammar's precedence ladder.
@@ -112,7 +168,8 @@ struct Expr
     /**
      * @brief The kinds of node an expression can be.
      */
-    using Node_t = std::variant<Int_literal, Float_literal, Bool_literal, Name, Unary, Binary, Ternary>;
+    using Node_t = std::variant<Int_literal, Float_literal, Bool_literal, Name, Unary, Postfix, Call, Member,
+                                 Subscript, Binary, Ternary>;
 
     /**
      * @brief The node this expression holds.

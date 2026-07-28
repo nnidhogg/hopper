@@ -28,6 +28,11 @@ munch::core::Lexer build_lexer()
 
     builder.add_token(text("("), Token_kind::Left_paren, 1);
     builder.add_token(text(")"), Token_kind::Right_paren, 1);
+    builder.add_token(text("["), Token_kind::Left_bracket, 1);
+    builder.add_token(text("]"), Token_kind::Right_bracket, 1);
+    builder.add_token(text("."), Token_kind::Dot, 1);
+    builder.add_token(text("->"), Token_kind::Arrow, 1);
+    builder.add_token(text(","), Token_kind::Comma, 1);
     builder.add_token(text("?"), Token_kind::Question, 1);
     builder.add_token(text(":"), Token_kind::Colon, 1);
 
@@ -37,6 +42,8 @@ munch::core::Lexer build_lexer()
     builder.add_token(text("/"), Token_kind::Slash, 1);
     builder.add_token(text("%"), Token_kind::Percent, 1);
     builder.add_token(text("!"), Token_kind::Bang, 1);
+    builder.add_token(text("++"), Token_kind::Plus_plus, 1);
+    builder.add_token(text("--"), Token_kind::Minus_minus, 1);
     builder.add_token(text("=="), Token_kind::Equal_equal, 1);
     builder.add_token(text("!="), Token_kind::Bang_equal, 1);
     builder.add_token(text("<"), Token_kind::Less, 1);
