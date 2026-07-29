@@ -1,0 +1,152 @@
+#ifndef HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
+#define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
+
+#include <munch/tools/tokenizer/token.hpp>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include "hopper/parse/token_reader.hpp"
+
+namespace hopper::parse
+{
+/**
+ * @brief Base class providing the token-stream plumbing every recursive-descent parser needs.
+ *
+ * Wraps a Token_reader and exposes the standard LL(1) primitives: peeking, consuming, conditional acceptance,
+ * required expectation, and structured error reporting. A concrete parser derives from this and adds only its
+ * grammar functions.
+ * @tparam Kind The token kind type (enum or integral) produced by the lexer.
+ */
+template <typename Kind>
+class Parser_base
+{
+public:
+    /**
+     * @brief The token type produced by the underlying lexer.
+     */
+    using Token_t = munch::tools::tokenizer::Token<Kind>;
+
+protected:
+    /**
+     * @brief Construct the base around an existing token stream.
+     */
+    explicit Parser_base(Token_reader<Kind> reader) : reader_{std::move(reader)}
+    {}
+
+    ~Parser_base() = default;
+
+    /**
+     * @brief Retrieve the next token, throwing on a lexical error.
+     * @return The token, or std::nullopt at end of input.
+     */
+    [[nodiscard]] std::optional<Token_t> next_token()
+    {
+        const auto result{reader_.next()};
+
+        if (result.has_error())
+        {
+            throw std::runtime_error{"Lexical error: " + result.error().message()};
+        }
+
+        if (result.has_token())
+        {
+            return result.token();
+        }
+
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Look at the next token without consuming it, throwing on a lexical error.
+     * @return The token, or std::nullopt at end of input.
+     */
+    [[nodiscard]] std::optional<Token_t> peek_token()
+    {
+        const auto result{reader_.peek()};
+
+        if (result.has_error())
+        {
+            throw std::runtime_error{"Lexical error: " + result.error().message()};
+        }
+
+        if (result.has_token())
+        {
+            return result.token();
+        }
+
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Check whether the next token has the given kind, without consuming it.
+     */
+    [[nodiscard]] bool check(const Kind kind)
+    {
+        const auto token{peek_token()};
+
+        return token && token->kind() == kind;
+    }
+
+    /**
+     * @brief Consume and return the next token if it has the given kind.
+     */
+    [[nodiscard]] std::optional<Token_t> accept(const Kind kind)
+    {
+        if (!check(kind))
+        {
+            return std::nullopt;
+        }
+
+        return next_token();
+    }
+
+    /**
+     * @brief Require the next token to have the given kind, consuming it.
+     * @param kind The required token kind.
+     * @param what A human-readable description of what was expected, used in the error message.
+     * @throws std::runtime_error If the next token has a different kind, or the input ends first.
+     */
+    Token_t expect(const Kind kind, const std::string_view what)
+    {
+        const auto token{next_token()};
+
+        if (!token)
+        {
+            eof_error("Expected " + std::string(what) + " before end of input");
+        }
+
+        if (token->kind() != kind)
+        {
+            syntax_error("Expected " + std::string(what), *token);
+        }
+
+        return *token;
+    }
+
+    /**
+     * @brief Throw a syntax error naming the offending token.
+     */
+    [[noreturn]] void syntax_error(const std::string_view message, const Token_t& where)
+    {
+        throw std::runtime_error{
+                "Syntax error: " + std::string(message) + ", got '" + std::string(where.lexeme()) + "'"};
+    }
+
+    /**
+     * @brief Throw a syntax error for input that ended too early.
+     */
+    [[noreturn]] void eof_error(const std::string_view message)
+    {
+        throw std::runtime_error{"Syntax error: " + std::string(message)};
+    }
+
+private:
+    Token_reader<Kind> reader_;
+};
+
+} // namespace hopper::parse
+
+#endif // HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP

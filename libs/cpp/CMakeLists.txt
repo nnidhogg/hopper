@@ -3,12 +3,10 @@ cmake_policy(SET CMP0097 NEW)
 project(hopper_cpp)
 
 add_library(${PROJECT_NAME}
-        src/token_location.cpp
-        src/token_lookahead.cpp
-        src/token_reader.cpp
         src/lexer.cpp
         src/binary_operator.cpp
         src/parser.cpp
+        src/parse_expression.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -17,6 +15,8 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+        hopper_parse
         PRIVATE
         munch
 )

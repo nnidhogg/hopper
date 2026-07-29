@@ -1,8 +1,8 @@
-#include "hopper/cpp/token_location.hpp"
+#include "hopper/parse/token_location.hpp"
 
 #include <algorithm>
 
-namespace hopper::cpp
+namespace hopper::parse
 {
 Token_location::Token_location() : line_{1}, column_{1}, offset_{0}
 {}
@@ -27,18 +27,11 @@ void Token_location::reset() noexcept
     *this = Token_location{};
 }
 
-void Token_location::advance(const Token_kind kind, const std::string_view lexeme) noexcept
+void Token_location::advance(const std::string_view lexeme) noexcept
 {
-    if (kind == Token_kind::Newline)
-    {
-        std::ranges::for_each(lexeme, [this](const char c) { column_ = c == '\n' ? (++line_, 1) : column_ + 1; });
-    }
-    else
-    {
-        column_ += lexeme.size();
-    }
+    std::ranges::for_each(lexeme, [this](const char c) { column_ = c == '\n' ? (++line_, 1) : column_ + 1; });
 
     offset_ += lexeme.size();
 }
 
-} // namespace hopper::cpp
+} // namespace hopper::parse

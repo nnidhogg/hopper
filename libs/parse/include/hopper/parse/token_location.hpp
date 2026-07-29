@@ -1,12 +1,10 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_TOKEN_LOCATION_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_TOKEN_LOCATION_HPP
+#ifndef HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_TOKEN_LOCATION_HPP
+#define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_TOKEN_LOCATION_HPP
 
 #include <cstddef>
 #include <string_view>
 
-#include "tokens.hpp"
-
-namespace hopper::cpp
+namespace hopper::parse
 {
 /**
  * @brief Tracks the current position within the input source.
@@ -43,15 +41,14 @@ public:
     void reset() noexcept;
 
     /**
-     * @brief Advance the position based on a token.
+     * @brief Advance the position over a consumed lexeme.
      *
-     * Increments line, column, and offset counters according to the characters in the token's lexeme.
-     * Line endings (`\n`) reset the column counter and increment the line number.
+     * Newlines in the lexeme reset the column counter and increment the line number, so multi-line tokens
+     * advance the location correctly regardless of their kind.
      *
-     * @param kind   The kind of token being processed.
-     * @param lexeme The text of the token.
+     * @param lexeme The text of the consumed token.
      */
-    void advance(Token_kind kind, std::string_view lexeme) noexcept;
+    void advance(std::string_view lexeme) noexcept;
 
 private:
     std::size_t line_;
@@ -61,6 +58,6 @@ private:
     std::size_t offset_;
 };
 
-} // namespace hopper::cpp
+} // namespace hopper::parse
 
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_TOKEN_LOCATION_HPP
+#endif // HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_TOKEN_LOCATION_HPP

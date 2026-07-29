@@ -73,6 +73,14 @@ enum class Token_kind : uint8_t
     Newline,
 };
 
+/**
+ * @brief Returns true for token kinds the parser discards between meaningful tokens.
+ */
+[[nodiscard]] constexpr bool is_trivia(const Token_kind kind) noexcept
+{
+    return kind == Token_kind::Whitespace || kind == Token_kind::Newline;
+}
+
 } // namespace hopper::cpp
 
 #endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_TOKENS_HPP

@@ -3,14 +3,12 @@
 
 #include <filesystem>
 #include <munch/core/lexer.hpp>
-#include <munch/tools/tokenizer/token.hpp>
-#include <optional>
 #include <string>
-#include <string_view>
 
 #include "hopper/cpp/ast/expr.hpp"
-#include "hopper/cpp/token_reader.hpp"
 #include "hopper/cpp/tokens.hpp"
+#include "hopper/parse/parser_base.hpp"
+#include "hopper/parse/token_reader.hpp"
 
 namespace hopper::cpp
 {
@@ -22,19 +20,22 @@ namespace hopper::cpp
  * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
  * precedence-table-driven parse_binary() rather than one function per level), the ternary conditional, and
  * assignment (both right-associative). Casts are not covered yet.
+ *
+ * The token-stream plumbing lives in parse::Parser_base; this class holds only the grammar, with one
+ * implementation file per grammar area (parse_expression.cpp, ...).
  */
-class Parser
+class Parser : public parse::Parser_base<Token_kind>
 {
 public:
     /**
-     * @brief The token type produced by the underlying lexer.
+     * @brief The token stream type feeding this parser.
      */
-    using Token_t = munch::tools::tokenizer::Token<Token_kind>;
+    using Token_reader_t = parse::Token_reader<Token_kind>;
 
     /**
-     * @brief Construct a parser from an existing Token_reader.
+     * @brief Construct a parser from an existing token stream.
      */
-    explicit Parser(Token_reader reader);
+    explicit Parser(Token_reader_t reader);
 
     /**
      * @brief Construct a parser from a lexer and an in-memory string.
@@ -53,39 +54,6 @@ public:
     [[nodiscard]] ast::Expr parse_expression();
 
 private:
-    /**
-     * @brief Retrieve the next token, throwing on a lexical error.
-     * @return The token, or std::nullopt at end of input.
-     */
-    [[nodiscard]] std::optional<Token_t> next_token();
-
-    /**
-     * @brief Look at the next token without consuming it, throwing on a lexical error.
-     * @return The token, or std::nullopt at end of input.
-     */
-    [[nodiscard]] std::optional<Token_t> peek_token();
-
-    /**
-     * @brief Check whether the next token has the given kind, without consuming it.
-     */
-    [[nodiscard]] bool check(Token_kind kind);
-
-    /**
-     * @brief Consume and return the next token if it has the given kind.
-     */
-    [[nodiscard]] std::optional<Token_t> accept(Token_kind kind);
-
-    /**
-     * @brief Require the next token to have the given kind, consuming it.
-     * @param kind The required token kind.
-     * @param what A human-readable description of what was expected, used in the error message.
-     * @throws std::runtime_error If the next token has a different kind, or the input ends first.
-     */
-    Token_t expect(Token_kind kind, std::string_view what);
-
-    [[noreturn]] void syntax_error(std::string_view message, const Token_t& where);
-    [[noreturn]] void eof_error(std::string_view message);
-
     [[nodiscard]] ast::Expr parse_assignment();
     [[nodiscard]] ast::Expr parse_ternary();
 
@@ -99,8 +67,6 @@ private:
     [[nodiscard]] ast::Expr parse_unary();
     [[nodiscard]] ast::Expr parse_postfix();
     [[nodiscard]] ast::Expr parse_primary();
-
-    Token_reader reader_;
 };
 
 } // namespace hopper::cpp
