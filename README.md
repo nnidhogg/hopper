@@ -15,6 +15,9 @@ tracking**, and **error reporting**. The design focuses on **clarity**, **determ
 predictable API, making it easy to implement **LL(1)-style grammars** for DSLs, configuration formats, or full language
 front-ends.
 
+The name honors the painter [Edward Hopper](https://en.wikipedia.org/wiki/Edward_Hopper); that a recursive-descent
+parser hops from token to token is the pun.
+
 ## **Status: Work in Progress**
 
 This parsing library is actively developed and not yet feature-complete. The core components: **token streaming**,
