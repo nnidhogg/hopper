@@ -25,11 +25,13 @@ This parsing library is actively developed and not yet feature-complete. The cor
 abstractions are still evolving.
 
 As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
-parser for a subset of C++ **expressions**. It currently covers literals, identifiers, parenthesized subexpressions,
-unary operators (`+`, `-`, `!`, `~`), postfix operators (calls, `.`, `->`, `[]`, `++`, `--`), the standard
-left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
+parser for a subset of C++ **expressions and statements**. Expressions cover literals, identifiers, parenthesized
+subexpressions, unary operators (`+`, `-`, `!`, `~`), postfix operators (calls, `.`, `->`, `[]`, `++`, `--`), the
+standard left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
 bitwise-xor, bitwise-or, logical-and, logical-or), and the right-associative ternary conditional and assignment
-(plain `=` and the compound arithmetic/bitwise operators). Casts, declarations, and statements are not covered yet.
+(plain `=` and the compound arithmetic/bitwise operators). Statements cover the expression statement, the empty
+statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to the nearest `if`, `while`, and
+`return`. Casts and declarations are not covered yet.
 
 This serves as both a **reference implementation** and a **validation** of the library's design and usability.
 

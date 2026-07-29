@@ -8,10 +8,10 @@ namespace hopper::cpp
 /**
  * @brief The lexical token kinds recognized by the expression grammar.
  *
- * Scoped to expressions only: literals, identifiers, the boolean keywords, parentheses, the operators needed for
- * the postfix / unary / multiplicative / additive / shift / relational / equality / bitwise-and / bitwise-xor /
- * bitwise-or / logical-and / logical-or / ternary / assignment precedence ladder, and calls, member access, and
- * subscript. Casts, declarations, and statements are not covered yet.
+ * Scoped to expressions and statements: literals, identifiers, keywords, the grouping punctuation, and the
+ * operators needed for the postfix / unary / multiplicative / additive / shift / relational / equality /
+ * bitwise-and / bitwise-xor / bitwise-or / logical-and / logical-or / ternary / assignment precedence ladder,
+ * plus calls, member access, and subscript. Casts and declarations are not covered yet.
  */
 enum class Token_kind : uint8_t
 {
@@ -21,12 +21,19 @@ enum class Token_kind : uint8_t
     Identifier,
     Keyword_true,
     Keyword_false,
+    Keyword_if,
+    Keyword_else,
+    Keyword_while,
+    Keyword_return,
 
     // Grouping, calls, member access, subscript, and the ternary operator
     Left_paren,
     Right_paren,
     Left_bracket,
     Right_bracket,
+    Left_brace,
+    Right_brace,
+    Semicolon,
     Dot,
     Arrow,
     Comma,

@@ -7,6 +7,7 @@ add_library(${PROJECT_NAME}
         src/binary_operator.cpp
         src/parser.cpp
         src/parse_expression.cpp
+        src/parse_statement.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

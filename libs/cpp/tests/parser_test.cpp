@@ -201,11 +201,64 @@ std::string to_string(const ast::Expr& expr)
             expr.node);
 }
 
+// Renders the AST back as compact source, bracing the branches of if and while so the two possible bindings of a
+// dangling else render differently.
+std::string to_string(const ast::Stmt& stmt)
+{
+    return std::visit(
+            [](const auto& node) -> std::string {
+                using Node_t = std::decay_t<decltype(node)>;
+
+                if constexpr (std::is_same_v<Node_t, ast::Expr_stmt>)
+                {
+                    return to_string(node.expr) + ";";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Empty>)
+                {
+                    return ";";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Compound>)
+                {
+                    std::string statements;
+
+                    for (const auto& statement : node.statements)
+                    {
+                        statements += to_string(statement);
+                    }
+
+                    return "{" + statements + "}";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::If>)
+                {
+                    return "if(" + to_string(node.condition) + "){" + to_string(*node.then_branch) + "}" +
+                           (node.else_branch ? "else{" + to_string(*node.else_branch) + "}" : "");
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::While>)
+                {
+                    return "while(" + to_string(node.condition) + "){" + to_string(*node.body) + "}";
+                }
+                else
+                {
+                    static_assert(std::is_same_v<Node_t, ast::Return>);
+
+                    return node.value ? "return " + to_string(*node.value) + ";" : "return;";
+                }
+            },
+            stmt.node);
+}
+
 ast::Expr parse(const std::string& input)
 {
     Parser parser{build_lexer(), input};
 
     return parser.parse_expression();
+}
+
+ast::Stmt parse_stmt(const std::string& input)
+{
+    Parser parser{build_lexer(), input};
+
+    return parser.parse_statement();
 }
 
 } // namespace
@@ -617,4 +670,94 @@ TEST(Parser_test, Throws_on_empty_input)
 TEST(Parser_test, Throws_on_missing_ternary_colon)
 {
     EXPECT_THROW(parse("true ? 1"), std::runtime_error);
+}
+
+TEST(Parser_test, Expression_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("f(x);")), "f(x);");
+    EXPECT_EQ(to_string(parse_stmt("x = 1;")), "(x=1);");
+}
+
+TEST(Parser_test, Empty_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt(";")), ";");
+}
+
+TEST(Parser_test, Compound_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("{ x = 1; y = 2; }")), "{(x=1);(y=2);}");
+    EXPECT_EQ(to_string(parse_stmt("{}")), "{}");
+    EXPECT_EQ(to_string(parse_stmt("{ { x; } }")), "{{x;}}");
+}
+
+TEST(Parser_test, If_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("if (a) b;")), "if(a){b;}");
+}
+
+TEST(Parser_test, If_else_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("if (a) b; else c;")), "if(a){b;}else{c;}");
+}
+
+TEST(Parser_test, Dangling_else_binds_to_the_nearest_if)
+{
+    EXPECT_EQ(to_string(parse_stmt("if (a) if (b) c; else d;")), "if(a){if(b){c;}else{d;}}");
+}
+
+TEST(Parser_test, While_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("while (a < 10) a += 1;")), "while((a<10)){(a+=1);}");
+    EXPECT_EQ(to_string(parse_stmt("while (true) { f(); }")), "while(true){{f();}}");
+}
+
+TEST(Parser_test, Return_statement)
+{
+    EXPECT_EQ(to_string(parse_stmt("return;")), "return;");
+    EXPECT_EQ(to_string(parse_stmt("return x + 1;")), "return (x+1);");
+}
+
+TEST(Parser_test, Statements_compose)
+{
+    EXPECT_EQ(to_string(parse_stmt("{ x = 0; while (x < 3) { x += 1; } if (x == 3) return x; else return 0; }")),
+              "{(x=0);while((x<3)){{(x+=1);}}if((x==3)){return x;}else{return 0;}}");
+}
+
+TEST(Parser_test, Throws_on_missing_statement_semicolon)
+{
+    EXPECT_THROW(parse_stmt("x = 1"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("return x"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_unclosed_block)
+{
+    EXPECT_THROW(parse_stmt("{ x;"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_malformed_if)
+{
+    EXPECT_THROW(parse_stmt("if a) b;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("if (a) b"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("if (a)"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_lone_else)
+{
+    EXPECT_THROW(parse_stmt("else x;"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_trailing_statement_input)
+{
+    EXPECT_THROW(parse_stmt("x; y;"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_empty_statement_input)
+{
+    EXPECT_THROW(parse_stmt(""), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_when_a_keyword_is_used_as_an_expression)
+{
+    EXPECT_THROW(parse_stmt("x = if;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("while;"), std::runtime_error);
 }

@@ -19,6 +19,10 @@ munch::core::Lexer build_lexer()
     // Keywords outrank the identifier pattern, which would otherwise match the same lexeme.
     builder.add_token(text("true"), Token_kind::Keyword_true, 1);
     builder.add_token(text("false"), Token_kind::Keyword_false, 1);
+    builder.add_token(text("if"), Token_kind::Keyword_if, 1);
+    builder.add_token(text("else"), Token_kind::Keyword_else, 1);
+    builder.add_token(text("while"), Token_kind::Keyword_while, 1);
+    builder.add_token(text("return"), Token_kind::Keyword_return, 1);
 
     builder.add_token(patterns::identifier(), Token_kind::Identifier, 2);
 
@@ -30,6 +34,9 @@ munch::core::Lexer build_lexer()
     builder.add_token(text(")"), Token_kind::Right_paren, 1);
     builder.add_token(text("["), Token_kind::Left_bracket, 1);
     builder.add_token(text("]"), Token_kind::Right_bracket, 1);
+    builder.add_token(text("{"), Token_kind::Left_brace, 1);
+    builder.add_token(text("}"), Token_kind::Right_brace, 1);
+    builder.add_token(text(";"), Token_kind::Semicolon, 1);
     builder.add_token(text("."), Token_kind::Dot, 1);
     builder.add_token(text("->"), Token_kind::Arrow, 1);
     builder.add_token(text(","), Token_kind::Comma, 1);
