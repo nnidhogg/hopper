@@ -59,6 +59,18 @@ munch::core::Lexer build_lexer()
     builder.add_token(text("&&"), Token_kind::Amp_amp, 1);
     builder.add_token(text("||"), Token_kind::Pipe_pipe, 1);
 
+    builder.add_token(text("="), Token_kind::Equal, 1);
+    builder.add_token(text("+="), Token_kind::Plus_equal, 1);
+    builder.add_token(text("-="), Token_kind::Minus_equal, 1);
+    builder.add_token(text("*="), Token_kind::Star_equal, 1);
+    builder.add_token(text("/="), Token_kind::Slash_equal, 1);
+    builder.add_token(text("%="), Token_kind::Percent_equal, 1);
+    builder.add_token(text("&="), Token_kind::Amp_equal, 1);
+    builder.add_token(text("|="), Token_kind::Pipe_equal, 1);
+    builder.add_token(text("^="), Token_kind::Caret_equal, 1);
+    builder.add_token(text("<<="), Token_kind::Less_less_equal, 1);
+    builder.add_token(text(">>="), Token_kind::Greater_greater_equal, 1);
+
     builder.add_token(plus(any_of(Set{' ', '\t'})), Token_kind::Whitespace, 0);
     builder.add_token(plus(any_of(Set::newline())), Token_kind::Newline, 0);
 

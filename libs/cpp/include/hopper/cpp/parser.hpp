@@ -20,8 +20,8 @@ namespace hopper::cpp
  * Covers primary expressions (literals, identifiers, parenthesized subexpressions), postfix operators (calls,
  * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`/`~`, the multiplicative/additive/shift/relational/equality/
  * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
- * precedence-table-driven parse_binary() rather than one function per level), and the ternary conditional
- * (right-associative). Assignment and casts are not covered yet.
+ * precedence-table-driven parse_binary() rather than one function per level), the ternary conditional, and
+ * assignment (both right-associative). Casts are not covered yet.
  */
 class Parser
 {
@@ -86,6 +86,7 @@ private:
     [[noreturn]] void syntax_error(std::string_view message, const Token_t& where);
     [[noreturn]] void eof_error(std::string_view message);
 
+    [[nodiscard]] ast::Expr parse_assignment();
     [[nodiscard]] ast::Expr parse_ternary();
 
     /**

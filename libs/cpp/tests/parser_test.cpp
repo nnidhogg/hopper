@@ -100,6 +100,37 @@ std::string operator_symbol(const ast::Member_op op)
     return "?";
 }
 
+std::string operator_symbol(const ast::Assign_op op)
+{
+    switch (op)
+    {
+    case ast::Assign_op::Assign:
+        return "=";
+    case ast::Assign_op::Add:
+        return "+=";
+    case ast::Assign_op::Subtract:
+        return "-=";
+    case ast::Assign_op::Multiply:
+        return "*=";
+    case ast::Assign_op::Divide:
+        return "/=";
+    case ast::Assign_op::Modulo:
+        return "%=";
+    case ast::Assign_op::Bitwise_and:
+        return "&=";
+    case ast::Assign_op::Bitwise_xor:
+        return "^=";
+    case ast::Assign_op::Bitwise_or:
+        return "|=";
+    case ast::Assign_op::Shift_left:
+        return "<<=";
+    case ast::Assign_op::Shift_right:
+        return ">>=";
+    }
+
+    return "?";
+}
+
 // Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly
 // in the expected string rather than in a deeply nested chain of std::get<> assertions.
 std::string to_string(const ast::Expr& expr)
@@ -155,12 +186,16 @@ std::string to_string(const ast::Expr& expr)
                 {
                     return "(" + to_string(*node.lhs) + operator_symbol(node.op) + to_string(*node.rhs) + ")";
                 }
-                else
+                else if constexpr (std::is_same_v<Node_t, ast::Ternary>)
                 {
-                    static_assert(std::is_same_v<Node_t, ast::Ternary>);
-
                     return "(" + to_string(*node.condition) + "?" + to_string(*node.then_branch) + ":" +
                            to_string(*node.else_branch) + ")";
+                }
+                else
+                {
+                    static_assert(std::is_same_v<Node_t, ast::Assign>);
+
+                    return "(" + to_string(*node.target) + operator_symbol(node.op) + to_string(*node.value) + ")";
                 }
             },
             expr.node);
@@ -487,6 +522,66 @@ TEST(Parser_test, Ternary_is_right_associative)
 TEST(Parser_test, Ternary_binds_looser_than_logical_or)
 {
     EXPECT_EQ(to_string(parse("true || false ? 1 : 2")), "((true||false)?1:2)");
+}
+
+TEST(Parser_test, Simple_assignment)
+{
+    EXPECT_EQ(to_string(parse("x = 1")), "(x=1)");
+}
+
+TEST(Parser_test, Compound_assignments)
+{
+    EXPECT_EQ(to_string(parse("x += 1")), "(x+=1)");
+    EXPECT_EQ(to_string(parse("x -= 1")), "(x-=1)");
+    EXPECT_EQ(to_string(parse("x *= 1")), "(x*=1)");
+    EXPECT_EQ(to_string(parse("x /= 1")), "(x/=1)");
+    EXPECT_EQ(to_string(parse("x %= 1")), "(x%=1)");
+    EXPECT_EQ(to_string(parse("x &= 1")), "(x&=1)");
+    EXPECT_EQ(to_string(parse("x |= 1")), "(x|=1)");
+    EXPECT_EQ(to_string(parse("x ^= 1")), "(x^=1)");
+    EXPECT_EQ(to_string(parse("x <<= 1")), "(x<<=1)");
+    EXPECT_EQ(to_string(parse("x >>= 1")), "(x>>=1)");
+}
+
+TEST(Parser_test, Assignment_is_right_associative)
+{
+    EXPECT_EQ(to_string(parse("a = b = c")), "(a=(b=c))");
+}
+
+TEST(Parser_test, Assignment_binds_looser_than_ternary)
+{
+    EXPECT_EQ(to_string(parse("a = true ? 1 : 2")), "(a=(true?1:2))");
+}
+
+TEST(Parser_test, Ternary_branches_are_assignment_expressions)
+{
+    EXPECT_EQ(to_string(parse("true ? a = 1 : b = 2")), "(true?(a=1):(b=2))");
+}
+
+TEST(Parser_test, Assignment_target_can_be_a_postfix_expression)
+{
+    EXPECT_EQ(to_string(parse("object.field = 1")), "((object.field)=1)");
+    EXPECT_EQ(to_string(parse("array[0] = 1")), "((array[0])=1)");
+}
+
+TEST(Parser_test, Assignment_in_call_arguments)
+{
+    EXPECT_EQ(to_string(parse("f(a = 1)")), "f((a=1))");
+}
+
+TEST(Parser_test, Assignment_in_subscript_index)
+{
+    EXPECT_EQ(to_string(parse("array[a = 1]")), "(array[(a=1)])");
+}
+
+TEST(Parser_test, Assignment_in_parentheses)
+{
+    EXPECT_EQ(to_string(parse("(a = 1)")), "(a=1)");
+}
+
+TEST(Parser_test, Throws_on_missing_assignment_value)
+{
+    EXPECT_THROW(parse("x ="), std::runtime_error);
 }
 
 TEST(Parser_test, Full_precedence_chain)

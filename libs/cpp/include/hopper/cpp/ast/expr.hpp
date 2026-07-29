@@ -65,6 +65,24 @@ enum class Member_op
 };
 
 /**
+ * @brief An assignment operator: plain `=`, or a compound assignment combining it with a binary operator.
+ */
+enum class Assign_op
+{
+    Assign,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Bitwise_and,
+    Bitwise_xor,
+    Bitwise_or,
+    Shift_left,
+    Shift_right,
+};
+
+/**
  * @brief An integer literal, e.g. `42`.
  */
 struct Int_literal
@@ -167,6 +185,19 @@ struct Ternary
 };
 
 /**
+ * @brief An assignment, e.g. `x = y` or `x += y`.
+ *
+ * Right-associative: `a = b = c` parses as `a = (b = c)`. `target` is not restricted to names here; rejecting a
+ * non-assignable target (e.g. `1 = 2`) is left to a later semantic pass, not the parser.
+ */
+struct Assign
+{
+    Assign_op op;
+    std::unique_ptr<Expr> target;
+    std::unique_ptr<Expr> value;
+};
+
+/**
  * @brief An expression node, as a variant of plain structs rather than a class hierarchy.
  */
 struct Expr
@@ -175,7 +206,7 @@ struct Expr
      * @brief The kinds of node an expression can be.
      */
     using Node_t = std::variant<Int_literal, Float_literal, Bool_literal, Name, Unary, Postfix, Call, Member,
-                                 Subscript, Binary, Ternary>;
+                                 Subscript, Binary, Ternary, Assign>;
 
     /**
      * @brief The node this expression holds.

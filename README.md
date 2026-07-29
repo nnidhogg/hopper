@@ -23,9 +23,10 @@ abstractions are still evolving.
 
 As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
 parser for a subset of C++ **expressions**. It currently covers literals, identifiers, parenthesized subexpressions,
-unary operators, postfix operators (calls, `.`, `->`, `[]`, `++`, `--`), the standard left-associative binary
-precedence ladder (multiplicative, additive, relational, equality, logical-and, logical-or), and the
-right-associative ternary conditional. Assignment, casts, declarations, and statements are not covered yet.
+unary operators (`+`, `-`, `!`, `~`), postfix operators (calls, `.`, `->`, `[]`, `++`, `--`), the standard
+left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
+bitwise-xor, bitwise-or, logical-and, logical-or), and the right-associative ternary conditional and assignment
+(plain `=` and the compound arithmetic/bitwise operators). Casts, declarations, and statements are not covered yet.
 
 This serves as both a **reference implementation** and a **validation** of the library's design and usability.
 

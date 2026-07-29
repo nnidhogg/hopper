@@ -25,6 +25,46 @@ ast::Expr make_binary(const ast::Binary_op op, ast::Expr lhs, ast::Expr rhs)
             }};
 }
 
+ast::Expr make_assign(const ast::Assign_op op, ast::Expr target, ast::Expr value)
+{
+    return {.node = ast::Assign{
+                    .op = op,
+                    .target = std::make_unique<ast::Expr>(std::move(target)),
+                    .value = std::make_unique<ast::Expr>(std::move(value)),
+            }};
+}
+
+std::optional<ast::Assign_op> assign_operator_for(const Token_kind kind)
+{
+    switch (kind)
+    {
+    case Token_kind::Equal:
+        return ast::Assign_op::Assign;
+    case Token_kind::Plus_equal:
+        return ast::Assign_op::Add;
+    case Token_kind::Minus_equal:
+        return ast::Assign_op::Subtract;
+    case Token_kind::Star_equal:
+        return ast::Assign_op::Multiply;
+    case Token_kind::Slash_equal:
+        return ast::Assign_op::Divide;
+    case Token_kind::Percent_equal:
+        return ast::Assign_op::Modulo;
+    case Token_kind::Amp_equal:
+        return ast::Assign_op::Bitwise_and;
+    case Token_kind::Pipe_equal:
+        return ast::Assign_op::Bitwise_or;
+    case Token_kind::Caret_equal:
+        return ast::Assign_op::Bitwise_xor;
+    case Token_kind::Less_less_equal:
+        return ast::Assign_op::Shift_left;
+    case Token_kind::Greater_greater_equal:
+        return ast::Assign_op::Shift_right;
+    default:
+        return std::nullopt;
+    }
+}
+
 } // namespace
 
 Parser::Parser(Token_reader reader) : reader_{std::move(reader)}
@@ -116,7 +156,7 @@ Parser::Token_t Parser::expect(const Token_kind kind, const std::string_view wha
 
 ast::Expr Parser::parse_expression()
 {
-    auto expr{parse_ternary()};
+    auto expr{parse_assignment()};
 
     if (const auto trailing{peek_token()}; trailing)
     {
@@ -124,6 +164,25 @@ ast::Expr Parser::parse_expression()
     }
 
     return expr;
+}
+
+ast::Expr Parser::parse_assignment()
+{
+    auto expr{parse_ternary()};
+
+    const auto token{peek_token()};
+    const auto op{token ? assign_operator_for(token->kind()) : std::nullopt};
+
+    if (!op)
+    {
+        return expr;
+    }
+
+    (void)next_token();
+
+    // Right-associative: the right-hand side is itself a full assignment-expression, so `a = b = c` parses as
+    // `a = (b = c)`. `expr` (the target) is not checked for being an lvalue here; see ast::Assign.
+    return make_assign(*op, std::move(expr), parse_assignment());
 }
 
 ast::Expr Parser::parse_ternary()
@@ -136,13 +195,13 @@ ast::Expr Parser::parse_ternary()
         return condition;
     }
 
-    // The real C++ grammar takes a full `expression` here and an `assignment-expression` for the else branch;
-    // both are simplified to `parse_ternary()` since this grammar has neither the comma operator nor assignment.
-    auto then_branch{parse_ternary()};
+    // The real C++ grammar takes a full `expression` here; simplified to parse_assignment() since this grammar
+    // has no comma operator. The else branch is exactly an assignment-expression in real C++ too.
+    auto then_branch{parse_assignment()};
 
     expect(Token_kind::Colon, "':' in conditional expression");
 
-    auto else_branch{parse_ternary()};
+    auto else_branch{parse_assignment()};
 
     return {.node = ast::Ternary{
                     .condition = std::make_unique<ast::Expr>(std::move(condition)),
@@ -210,13 +269,11 @@ ast::Expr Parser::parse_postfix()
 
             if (!check(Token_kind::Right_paren))
             {
-                // Real C++ takes assignment-expressions here; simplified to parse_ternary() since this grammar has
-                // no assignment.
-                arguments.push_back(parse_ternary());
+                arguments.push_back(parse_assignment());
 
                 while (accept(Token_kind::Comma))
                 {
-                    arguments.push_back(parse_ternary());
+                    arguments.push_back(parse_assignment());
                 }
             }
 
@@ -229,7 +286,7 @@ ast::Expr Parser::parse_postfix()
         }
         else if (accept(Token_kind::Left_bracket))
         {
-            auto index{parse_ternary()};
+            auto index{parse_assignment()};
 
             expect(Token_kind::Right_bracket, "']' to close the subscript");
 
@@ -310,7 +367,9 @@ ast::Expr Parser::parse_primary()
 
     if (accept(Token_kind::Left_paren))
     {
-        auto expr{parse_ternary()};
+        // Real C++ takes a full `expression` here (assignment and the comma operator both allowed); simplified
+        // to parse_assignment() since this grammar has no comma operator.
+        auto expr{parse_assignment()};
 
         expect(Token_kind::Right_paren, "')' to close '('");
 

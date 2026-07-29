@@ -10,8 +10,8 @@ namespace hopper::cpp
  *
  * Scoped to expressions only: literals, identifiers, the boolean keywords, parentheses, the operators needed for
  * the postfix / unary / multiplicative / additive / shift / relational / equality / bitwise-and / bitwise-xor /
- * bitwise-or / logical-and / logical-or / ternary precedence ladder, and calls, member access, and subscript.
- * Assignment, casts, declarations, and statements are not covered yet.
+ * bitwise-or / logical-and / logical-or / ternary / assignment precedence ladder, and calls, member access, and
+ * subscript. Casts, declarations, and statements are not covered yet.
  */
 enum class Token_kind : uint8_t
 {
@@ -56,6 +56,17 @@ enum class Token_kind : uint8_t
     Caret,
     Amp_amp,
     Pipe_pipe,
+    Equal,
+    Plus_equal,
+    Minus_equal,
+    Star_equal,
+    Slash_equal,
+    Percent_equal,
+    Amp_equal,
+    Pipe_equal,
+    Caret_equal,
+    Less_less_equal,
+    Greater_greater_equal,
 
     // Trivia
     Whitespace,
