@@ -201,6 +201,31 @@ std::string to_string(const ast::Expr& expr)
             expr.node);
 }
 
+std::string type_name(const ast::Type& type)
+{
+    const auto name{[&type]() -> std::string {
+        switch (type.kind)
+        {
+        case ast::Type_kind::Bool:
+            return "bool";
+        case ast::Type_kind::Char:
+            return "char";
+        case ast::Type_kind::Int:
+            return "int";
+        case ast::Type_kind::Float:
+            return "float";
+        case ast::Type_kind::Double:
+            return "double";
+        case ast::Type_kind::Void:
+            return "void";
+        }
+
+        return "?";
+    }()};
+
+    return (type.is_const ? "const " : "") + name;
+}
+
 // Renders the AST back as compact source, bracing the branches of if and while so the two possible bindings of a
 // dangling else render differently.
 std::string to_string(const ast::Stmt& stmt)
@@ -237,11 +262,24 @@ std::string to_string(const ast::Stmt& stmt)
                 {
                     return "while(" + to_string(node.condition) + "){" + to_string(*node.body) + "}";
                 }
+                else if constexpr (std::is_same_v<Node_t, ast::Return>)
+                {
+                    return node.value ? "return " + to_string(*node.value) + ";" : "return;";
+                }
                 else
                 {
-                    static_assert(std::is_same_v<Node_t, ast::Return>);
+                    static_assert(std::is_same_v<Node_t, ast::Declaration>);
 
-                    return node.value ? "return " + to_string(*node.value) + ";" : "return;";
+                    std::string declarators;
+
+                    for (const auto& declarator : node.declarators)
+                    {
+                        declarators += (declarators.empty() ? "" : ",") + std::string(declarator.pointers, '*') +
+                                       (declarator.reference ? "&" : "") + declarator.name +
+                                       (declarator.initializer ? "=" + to_string(*declarator.initializer) : "");
+                    }
+
+                    return type_name(node.type) + " " + declarators + ";";
                 }
             },
             stmt.node);
@@ -760,4 +798,65 @@ TEST(Parser_test, Throws_when_a_keyword_is_used_as_an_expression)
 {
     EXPECT_THROW(parse_stmt("x = if;"), std::runtime_error);
     EXPECT_THROW(parse_stmt("while;"), std::runtime_error);
+}
+
+TEST(Parser_test, Declaration_of_a_single_variable)
+{
+    EXPECT_EQ(to_string(parse_stmt("int x;")), "int x;");
+}
+
+TEST(Parser_test, Declaration_with_initializer)
+{
+    EXPECT_EQ(to_string(parse_stmt("int x = 1 + 2;")), "int x=(1+2);");
+}
+
+TEST(Parser_test, Declaration_of_multiple_declarators)
+{
+    EXPECT_EQ(to_string(parse_stmt("int a, b = 2, c;")), "int a,b=2,c;");
+}
+
+TEST(Parser_test, Declaration_types)
+{
+    EXPECT_EQ(to_string(parse_stmt("bool flag = true;")), "bool flag=true;");
+    EXPECT_EQ(to_string(parse_stmt("char letter;")), "char letter;");
+    EXPECT_EQ(to_string(parse_stmt("float ratio;")), "float ratio;");
+    EXPECT_EQ(to_string(parse_stmt("double value = 3.5;")), "double value=3.500000;");
+    EXPECT_EQ(to_string(parse_stmt("void* opaque;")), "void *opaque;");
+}
+
+TEST(Parser_test, Declaration_pointers_and_references)
+{
+    EXPECT_EQ(to_string(parse_stmt("int* p;")), "int *p;");
+    EXPECT_EQ(to_string(parse_stmt("int** pp = q;")), "int **pp=q;");
+    EXPECT_EQ(to_string(parse_stmt("double& r = d;")), "double &r=d;");
+    // A reference to pointer; each declarator carries its own pointer and reference shape.
+    EXPECT_EQ(to_string(parse_stmt("int *&rp = p, plain;")), "int *&rp=p,plain;");
+}
+
+TEST(Parser_test, Declaration_const_placement)
+{
+    EXPECT_EQ(to_string(parse_stmt("const int x = 1;")), "const int x=1;");
+    EXPECT_EQ(to_string(parse_stmt("int const x = 1;")), "const int x=1;");
+    EXPECT_THROW(parse_stmt("const int const x;"), std::runtime_error);
+}
+
+TEST(Parser_test, Declaration_initializer_commas_belong_to_the_call)
+{
+    // The comma inside f(1, 2) is an argument separator; only the comma after ')' starts the next declarator.
+    EXPECT_EQ(to_string(parse_stmt("int a = f(1, 2), b;")), "int a=f(1,2),b;");
+}
+
+TEST(Parser_test, Declarations_inside_blocks)
+{
+    EXPECT_EQ(to_string(parse_stmt("{ int i = 0; i = i + 1; }")), "{int i=0;(i=(i+1));}");
+}
+
+TEST(Parser_test, Throws_on_malformed_declarations)
+{
+    EXPECT_THROW(parse_stmt("int;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int x"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int x = ;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int 5;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int x,;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("const x;"), std::runtime_error);
 }

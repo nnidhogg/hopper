@@ -21,8 +21,9 @@ namespace hopper::cpp
  * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
  * precedence-table-driven parse_binary() rather than one function per level), the ternary conditional, and
  * assignment (both right-associative). Statements cover the expression statement, the empty statement, compound
- * `{}` blocks, `if`/`else` (a dangling `else` binding to the nearest `if`), `while`, and `return`. Casts and
- * declarations are not covered yet.
+ * `{}` blocks, `if`/`else` (a dangling `else` binding to the nearest `if`), `while`, `return`, and declarations:
+ * a possibly const-qualified fundamental type followed by comma-separated pointer/reference declarators with
+ * optional initializers. Casts are not covered yet.
  *
  * The token-stream plumbing lives in parse::Parser_base; this class holds only the grammar, with one
  * implementation file per grammar area (parse_expression.cpp, parse_statement.cpp, ...).
@@ -89,6 +90,27 @@ private:
     [[nodiscard]] ast::Stmt parse_if_statement();
     [[nodiscard]] ast::Stmt parse_while_statement();
     [[nodiscard]] ast::Stmt parse_return_statement();
+
+    /**
+     * @brief Whether the next token can begin a declaration: a fundamental type keyword or the const qualifier.
+     *
+     * Types are restricted to keywords deliberately: an identifier in type position would make `a * b;` ambiguous
+     * between a declaration and an expression, which real C++ resolves through a symbol table the parser does not
+     * have.
+     */
+    [[nodiscard]] bool is_declaration_start();
+
+    [[nodiscard]] ast::Stmt parse_declaration_statement();
+
+    /**
+     * @brief Parse a type specifier, accepting the const qualifier before or after the type name.
+     */
+    [[nodiscard]] ast::Type parse_type_specifier();
+
+    /**
+     * @brief Parse one declarator: pointers, an optional reference, the name, and an optional initializer.
+     */
+    [[nodiscard]] ast::Declarator parse_declarator();
 };
 
 } // namespace hopper::cpp

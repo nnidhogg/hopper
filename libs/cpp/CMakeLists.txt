@@ -6,6 +6,7 @@ add_library(${PROJECT_NAME}
         src/lexer.cpp
         src/binary_operator.cpp
         src/parser.cpp
+        src/parse_declaration.cpp
         src/parse_expression.cpp
         src/parse_statement.cpp
 )

@@ -23,6 +23,13 @@ munch::core::Lexer build_lexer()
     builder.add_token(text("else"), Token_kind::Keyword_else, 1);
     builder.add_token(text("while"), Token_kind::Keyword_while, 1);
     builder.add_token(text("return"), Token_kind::Keyword_return, 1);
+    builder.add_token(text("const"), Token_kind::Keyword_const, 1);
+    builder.add_token(text("bool"), Token_kind::Keyword_bool, 1);
+    builder.add_token(text("char"), Token_kind::Keyword_char, 1);
+    builder.add_token(text("int"), Token_kind::Keyword_int, 1);
+    builder.add_token(text("float"), Token_kind::Keyword_float, 1);
+    builder.add_token(text("double"), Token_kind::Keyword_double, 1);
+    builder.add_token(text("void"), Token_kind::Keyword_void, 1);
 
     builder.add_token(patterns::identifier(), Token_kind::Identifier, 2);
 

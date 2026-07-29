@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "hopper/cpp/ast/decl.hpp"
 #include "hopper/cpp/ast/expr.hpp"
 
 namespace hopper::cpp::ast
@@ -73,7 +74,7 @@ struct Stmt
     /**
      * @brief The kinds of node a statement can be.
      */
-    using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, Return>;
+    using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, Return, Declaration>;
 
     /**
      * @brief The node this statement holds.

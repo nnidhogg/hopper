@@ -46,6 +46,11 @@ ast::Stmt Parser::parse_statement_node()
         return parse_return_statement();
     }
 
+    if (is_declaration_start())
+    {
+        return parse_declaration_statement();
+    }
+
     if (accept(Token_kind::Semicolon))
     {
         return {.node = ast::Empty{}};

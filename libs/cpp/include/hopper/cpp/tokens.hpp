@@ -11,7 +11,8 @@ namespace hopper::cpp
  * Scoped to expressions and statements: literals, identifiers, keywords, the grouping punctuation, and the
  * operators needed for the postfix / unary / multiplicative / additive / shift / relational / equality /
  * bitwise-and / bitwise-xor / bitwise-or / logical-and / logical-or / ternary / assignment precedence ladder,
- * plus calls, member access, and subscript. Casts and declarations are not covered yet.
+ * plus calls, member access, and subscript. Declarations add the const qualifier and the fundamental type
+ * keywords. Casts are not covered yet.
  */
 enum class Token_kind : uint8_t
 {
@@ -25,6 +26,15 @@ enum class Token_kind : uint8_t
     Keyword_else,
     Keyword_while,
     Keyword_return,
+
+    // The const qualifier and the fundamental type names
+    Keyword_const,
+    Keyword_bool,
+    Keyword_char,
+    Keyword_int,
+    Keyword_float,
+    Keyword_double,
+    Keyword_void,
 
     // Grouping, calls, member access, subscript, and the ternary operator
     Left_paren,
