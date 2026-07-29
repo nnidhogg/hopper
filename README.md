@@ -30,9 +30,10 @@ subexpressions, unary operators (`+`, `-`, `!`, `~`), postfix operators (calls, 
 standard left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
 bitwise-xor, bitwise-or, logical-and, logical-or), and the right-associative ternary conditional and assignment
 (plain `=` and the compound arithmetic/bitwise operators). Statements cover the expression statement, the empty
-statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to the nearest `if`, `while`, `return`,
-and declarations: a possibly const-qualified fundamental type followed by comma-separated pointer/reference
-declarators with optional initializers. Casts are not covered yet.
+statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to the nearest `if`, `while`, `for`
+with a declaration, expression, or empty init-statement, `do`/`while`, `return`, and declarations: a possibly
+const-qualified fundamental type followed by comma-separated pointer/reference declarators with optional
+initializers. Casts are not covered yet.
 
 This serves as both a **reference implementation** and a **validation** of the library's design and usability.
 

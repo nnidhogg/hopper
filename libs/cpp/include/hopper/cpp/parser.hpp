@@ -21,9 +21,10 @@ namespace hopper::cpp
  * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
  * precedence-table-driven parse_binary() rather than one function per level), the ternary conditional, and
  * assignment (both right-associative). Statements cover the expression statement, the empty statement, compound
- * `{}` blocks, `if`/`else` (a dangling `else` binding to the nearest `if`), `while`, `return`, and declarations:
- * a possibly const-qualified fundamental type followed by comma-separated pointer/reference declarators with
- * optional initializers. Casts are not covered yet.
+ * `{}` blocks, `if`/`else` (a dangling `else` binding to the nearest `if`), `while`, `for` (with a declaration,
+ * expression, or empty init-statement), `do`/`while`, `return`, and declarations: a possibly const-qualified
+ * fundamental type followed by comma-separated pointer/reference declarators with optional initializers. Casts are
+ * not covered yet.
  *
  * The token-stream plumbing lives in parse::Parser_base; this class holds only the grammar, with one
  * implementation file per grammar area (parse_expression.cpp, parse_statement.cpp, ...).
@@ -89,6 +90,13 @@ private:
     [[nodiscard]] ast::Stmt parse_compound_statement();
     [[nodiscard]] ast::Stmt parse_if_statement();
     [[nodiscard]] ast::Stmt parse_while_statement();
+
+    /**
+     * @brief Parse a `for` loop, whose init-statement may be a declaration, an expression statement, or empty.
+     */
+    [[nodiscard]] ast::Stmt parse_for_statement();
+
+    [[nodiscard]] ast::Stmt parse_do_statement();
     [[nodiscard]] ast::Stmt parse_return_statement();
 
     /**

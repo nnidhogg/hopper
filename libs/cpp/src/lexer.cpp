@@ -22,6 +22,8 @@ munch::core::Lexer build_lexer()
     builder.add_token(text("if"), Token_kind::Keyword_if, 1);
     builder.add_token(text("else"), Token_kind::Keyword_else, 1);
     builder.add_token(text("while"), Token_kind::Keyword_while, 1);
+    builder.add_token(text("for"), Token_kind::Keyword_for, 1);
+    builder.add_token(text("do"), Token_kind::Keyword_do, 1);
     builder.add_token(text("return"), Token_kind::Keyword_return, 1);
     builder.add_token(text("const"), Token_kind::Keyword_const, 1);
     builder.add_token(text("bool"), Token_kind::Keyword_bool, 1);

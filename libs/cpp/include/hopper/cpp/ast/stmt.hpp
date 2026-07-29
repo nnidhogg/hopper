@@ -59,6 +59,30 @@ struct While
 };
 
 /**
+ * @brief A `for` loop.
+ *
+ * `init` is always present and holds what stood before the first semicolon: a Declaration, an Expr_stmt, or Empty,
+ * mirroring the C++ grammar's init-statement. `condition` and `step` are absent when their slots were left empty,
+ * as in `for (;;)`.
+ */
+struct For
+{
+    std::unique_ptr<Stmt> init;
+    std::optional<Expr> condition;
+    std::optional<Expr> step;
+    std::unique_ptr<Stmt> body;
+};
+
+/**
+ * @brief A `do`/`while` loop: the body runs before the condition is first tested.
+ */
+struct Do_while
+{
+    std::unique_ptr<Stmt> body;
+    Expr condition;
+};
+
+/**
  * @brief A `return` statement with an optional value.
  */
 struct Return
@@ -74,7 +98,7 @@ struct Stmt
     /**
      * @brief The kinds of node a statement can be.
      */
-    using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, Return, Declaration>;
+    using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, For, Do_while, Return, Declaration>;
 
     /**
      * @brief The node this statement holds.

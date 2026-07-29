@@ -262,6 +262,16 @@ std::string to_string(const ast::Stmt& stmt)
                 {
                     return "while(" + to_string(node.condition) + "){" + to_string(*node.body) + "}";
                 }
+                else if constexpr (std::is_same_v<Node_t, ast::For>)
+                {
+                    // The init renders with its own trailing ';' in all three of its forms.
+                    return "for(" + to_string(*node.init) + (node.condition ? to_string(*node.condition) : "") +
+                           ";" + (node.step ? to_string(*node.step) : "") + "){" + to_string(*node.body) + "}";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Do_while>)
+                {
+                    return "do{" + to_string(*node.body) + "}while(" + to_string(node.condition) + ");";
+                }
                 else if constexpr (std::is_same_v<Node_t, ast::Return>)
                 {
                     return node.value ? "return " + to_string(*node.value) + ";" : "return;";
@@ -859,4 +869,62 @@ TEST(Parser_test, Throws_on_malformed_declarations)
     EXPECT_THROW(parse_stmt("int 5;"), std::runtime_error);
     EXPECT_THROW(parse_stmt("int x,;"), std::runtime_error);
     EXPECT_THROW(parse_stmt("const x;"), std::runtime_error);
+}
+
+TEST(Parser_test, For_with_declaration_init)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (int i = 0; i < 10; i++) f(i);")), "for(int i=0;(i<10);(i++)){f(i);}");
+}
+
+TEST(Parser_test, For_with_expression_init)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (i = 0; i < 10; i++) f(i);")), "for((i=0);(i<10);(i++)){f(i);}");
+}
+
+TEST(Parser_test, For_with_empty_header)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (;;) f();")), "for(;;){f();}");
+}
+
+TEST(Parser_test, For_header_slots_are_independent)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (; i < 10;) f(i);")), "for(;(i<10);){f(i);}");
+    EXPECT_EQ(to_string(parse_stmt("for (i = 0;; i++) f(i);")), "for((i=0);;(i++)){f(i);}");
+}
+
+TEST(Parser_test, For_init_declares_multiple_variables)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (int i = 0, n = limit(); i < n; i++) f(i);")),
+              "for(int i=0,n=limit();(i<n);(i++)){f(i);}");
+}
+
+TEST(Parser_test, For_bodies_nest)
+{
+    EXPECT_EQ(to_string(parse_stmt("for (;;) for (;;) f();")), "for(;;){for(;;){f();}}");
+}
+
+TEST(Parser_test, Do_while)
+{
+    EXPECT_EQ(to_string(parse_stmt("do f(x); while (x < 10);")), "do{f(x);}while((x<10));");
+}
+
+TEST(Parser_test, Do_while_with_block_body)
+{
+    EXPECT_EQ(to_string(parse_stmt("do { x = x + 1; f(x); } while (x < 10);")),
+              "do{{(x=(x+1));f(x);}}while((x<10));");
+}
+
+TEST(Parser_test, Throws_on_malformed_for)
+{
+    EXPECT_THROW(parse_stmt("for () f();"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("for (int i = 0) f();"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("for (;; f();"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("for (;;)"), std::runtime_error);
+}
+
+TEST(Parser_test, Throws_on_malformed_do_while)
+{
+    EXPECT_THROW(parse_stmt("do f();"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("do f(); while (x)"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("do while (x);"), std::runtime_error);
 }

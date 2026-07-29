@@ -41,6 +41,16 @@ ast::Stmt Parser::parse_statement_node()
         return parse_while_statement();
     }
 
+    if (check(Token_kind::Keyword_for))
+    {
+        return parse_for_statement();
+    }
+
+    if (check(Token_kind::Keyword_do))
+    {
+        return parse_do_statement();
+    }
+
     if (check(Token_kind::Keyword_return))
     {
         return parse_return_statement();
@@ -127,6 +137,82 @@ ast::Stmt Parser::parse_while_statement()
     return {.node = ast::While{
                     .condition = std::move(condition),
                     .body = std::make_unique<ast::Stmt>(std::move(body)),
+            }};
+}
+
+ast::Stmt Parser::parse_for_statement()
+{
+    expect(Token_kind::Keyword_for, "'for'");
+
+    expect(Token_kind::Left_paren, "'(' after 'for'");
+
+    // The init-statement carries its own semicolon in all three of its forms, exactly as in the C++ grammar: a
+    // declaration, an expression statement, or the empty statement.
+    auto init{[this]() -> ast::Stmt {
+        if (accept(Token_kind::Semicolon))
+        {
+            return {.node = ast::Empty{}};
+        }
+
+        if (is_declaration_start())
+        {
+            return parse_declaration_statement();
+        }
+
+        auto expr{parse_assignment()};
+
+        expect(Token_kind::Semicolon, "';' after the loop initializer");
+
+        return {.node = ast::Expr_stmt{.expr = std::move(expr)}};
+    }()};
+
+    std::optional<ast::Expr> condition;
+
+    if (!check(Token_kind::Semicolon))
+    {
+        condition = parse_assignment();
+    }
+
+    expect(Token_kind::Semicolon, "';' after the loop condition");
+
+    std::optional<ast::Expr> step;
+
+    if (!check(Token_kind::Right_paren))
+    {
+        step = parse_assignment();
+    }
+
+    expect(Token_kind::Right_paren, "')' to close the loop header");
+
+    auto body{parse_statement_node()};
+
+    return {.node = ast::For{
+                    .init = std::make_unique<ast::Stmt>(std::move(init)),
+                    .condition = std::move(condition),
+                    .step = std::move(step),
+                    .body = std::make_unique<ast::Stmt>(std::move(body)),
+            }};
+}
+
+ast::Stmt Parser::parse_do_statement()
+{
+    expect(Token_kind::Keyword_do, "'do'");
+
+    auto body{parse_statement_node()};
+
+    expect(Token_kind::Keyword_while, "'while' after the loop body");
+
+    expect(Token_kind::Left_paren, "'(' after 'while'");
+
+    auto condition{parse_assignment()};
+
+    expect(Token_kind::Right_paren, "')' to close the condition");
+
+    expect(Token_kind::Semicolon, "';' after the do/while loop");
+
+    return {.node = ast::Do_while{
+                    .body = std::make_unique<ast::Stmt>(std::move(body)),
+                    .condition = std::move(condition),
             }};
 }
 

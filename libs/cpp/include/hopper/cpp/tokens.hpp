@@ -25,6 +25,8 @@ enum class Token_kind : uint8_t
     Keyword_if,
     Keyword_else,
     Keyword_while,
+    Keyword_for,
+    Keyword_do,
     Keyword_return,
 
     // The const qualifier and the fundamental type names
