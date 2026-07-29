@@ -9,9 +9,9 @@ namespace hopper::cpp
  * @brief The lexical token kinds recognized by the expression grammar.
  *
  * Scoped to expressions only: literals, identifiers, the boolean keywords, parentheses, the operators needed for
- * the postfix / unary / multiplicative / additive / relational / equality / logical-and / logical-or / ternary
- * precedence ladder, and calls, member access, and subscript. Assignment, casts, declarations, and statements are
- * not covered yet.
+ * the postfix / unary / multiplicative / additive / shift / relational / equality / bitwise-and / bitwise-xor /
+ * bitwise-or / logical-and / logical-or / ternary precedence ladder, and calls, member access, and subscript.
+ * Assignment, casts, declarations, and statements are not covered yet.
  */
 enum class Token_kind : uint8_t
 {
@@ -40,6 +40,7 @@ enum class Token_kind : uint8_t
     Slash,
     Percent,
     Bang,
+    Tilde,
     Plus_plus,
     Minus_minus,
     Equal_equal,
@@ -48,6 +49,11 @@ enum class Token_kind : uint8_t
     Greater,
     Less_equal,
     Greater_equal,
+    Less_less,
+    Greater_greater,
+    Amp,
+    Pipe,
+    Caret,
     Amp_amp,
     Pipe_pipe,
 

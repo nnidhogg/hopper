@@ -18,6 +18,7 @@ enum class Unary_op
     Plus,
     Minus,
     Not,
+    Bitwise_not,
 };
 
 /**
@@ -36,6 +37,11 @@ enum class Binary_op
     Greater_equal,
     Equal,
     Not_equal,
+    Shift_left,
+    Shift_right,
+    Bitwise_and,
+    Bitwise_xor,
+    Bitwise_or,
     Logical_and,
     Logical_or,
 };

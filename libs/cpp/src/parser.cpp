@@ -5,6 +5,8 @@
 #include <utility>
 #include <vector>
 
+#include "hopper/cpp/binary_operator.hpp"
+
 namespace hopper::cpp
 {
 namespace
@@ -126,7 +128,8 @@ ast::Expr Parser::parse_expression()
 
 ast::Expr Parser::parse_ternary()
 {
-    auto condition{parse_logical_or()};
+    // 1 is Logical_or's precedence in binary_operator_for(), the loosest-binding binary operator.
+    auto condition{parse_binary(1)};
 
     if (!accept(Token_kind::Question))
     {
@@ -148,123 +151,25 @@ ast::Expr Parser::parse_ternary()
             }};
 }
 
-ast::Expr Parser::parse_logical_or()
-{
-    auto expr{parse_logical_and()};
-
-    while (accept(Token_kind::Pipe_pipe))
-    {
-        expr = make_binary(ast::Binary_op::Logical_or, std::move(expr), parse_logical_and());
-    }
-
-    return expr;
-}
-
-ast::Expr Parser::parse_logical_and()
-{
-    auto expr{parse_equality()};
-
-    while (accept(Token_kind::Amp_amp))
-    {
-        expr = make_binary(ast::Binary_op::Logical_and, std::move(expr), parse_equality());
-    }
-
-    return expr;
-}
-
-ast::Expr Parser::parse_equality()
-{
-    auto expr{parse_relational()};
-
-    for (;;)
-    {
-        if (accept(Token_kind::Equal_equal))
-        {
-            expr = make_binary(ast::Binary_op::Equal, std::move(expr), parse_relational());
-        }
-        else if (accept(Token_kind::Bang_equal))
-        {
-            expr = make_binary(ast::Binary_op::Not_equal, std::move(expr), parse_relational());
-        }
-        else
-        {
-            return expr;
-        }
-    }
-}
-
-ast::Expr Parser::parse_relational()
-{
-    auto expr{parse_additive()};
-
-    for (;;)
-    {
-        if (accept(Token_kind::Less))
-        {
-            expr = make_binary(ast::Binary_op::Less, std::move(expr), parse_additive());
-        }
-        else if (accept(Token_kind::Greater))
-        {
-            expr = make_binary(ast::Binary_op::Greater, std::move(expr), parse_additive());
-        }
-        else if (accept(Token_kind::Less_equal))
-        {
-            expr = make_binary(ast::Binary_op::Less_equal, std::move(expr), parse_additive());
-        }
-        else if (accept(Token_kind::Greater_equal))
-        {
-            expr = make_binary(ast::Binary_op::Greater_equal, std::move(expr), parse_additive());
-        }
-        else
-        {
-            return expr;
-        }
-    }
-}
-
-ast::Expr Parser::parse_additive()
-{
-    auto expr{parse_multiplicative()};
-
-    for (;;)
-    {
-        if (accept(Token_kind::Plus))
-        {
-            expr = make_binary(ast::Binary_op::Add, std::move(expr), parse_multiplicative());
-        }
-        else if (accept(Token_kind::Minus))
-        {
-            expr = make_binary(ast::Binary_op::Subtract, std::move(expr), parse_multiplicative());
-        }
-        else
-        {
-            return expr;
-        }
-    }
-}
-
-ast::Expr Parser::parse_multiplicative()
+ast::Expr Parser::parse_binary(const int min_precedence)
 {
     auto expr{parse_unary()};
 
     for (;;)
     {
-        if (accept(Token_kind::Star))
-        {
-            expr = make_binary(ast::Binary_op::Multiply, std::move(expr), parse_unary());
-        }
-        else if (accept(Token_kind::Slash))
-        {
-            expr = make_binary(ast::Binary_op::Divide, std::move(expr), parse_unary());
-        }
-        else if (accept(Token_kind::Percent))
-        {
-            expr = make_binary(ast::Binary_op::Modulo, std::move(expr), parse_unary());
-        }
-        else
+        const auto token{peek_token()};
+        const auto info{token ? binary_operator_for(token->kind()) : std::nullopt};
+
+        if (!info || info->precedence < min_precedence)
         {
             return expr;
         }
+
+        (void)next_token();
+
+        // info->precedence + 1 stops the recursive call from also consuming an operator of the same precedence,
+        // which is what makes every level in this ladder left-associative.
+        expr = make_binary(info->op, std::move(expr), parse_binary(info->precedence + 1));
     }
 }
 
@@ -283,6 +188,11 @@ ast::Expr Parser::parse_unary()
     if (accept(Token_kind::Bang))
     {
         return make_unary(ast::Unary_op::Not, parse_unary());
+    }
+
+    if (accept(Token_kind::Tilde))
+    {
+        return make_unary(ast::Unary_op::Bitwise_not, parse_unary());
     }
 
     return parse_postfix();

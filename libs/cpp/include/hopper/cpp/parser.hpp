@@ -18,9 +18,10 @@ namespace hopper::cpp
  * @brief Recursive-descent, precedence-climbing parser for a subset of C++ expressions.
  *
  * Covers primary expressions (literals, identifiers, parenthesized subexpressions), postfix operators (calls,
- * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`, the multiplicative/additive/relational/equality/logical-and/
- * logical-or binary ladder (all left-associative), and the ternary conditional (right-associative). Assignment,
- * casts, and bitwise/shift operators are not covered yet.
+ * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`/`~`, the multiplicative/additive/shift/relational/equality/
+ * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
+ * precedence-table-driven parse_binary() rather than one function per level), and the ternary conditional
+ * (right-associative). Assignment and casts are not covered yet.
  */
 class Parser
 {
@@ -86,12 +87,14 @@ private:
     [[noreturn]] void eof_error(std::string_view message);
 
     [[nodiscard]] ast::Expr parse_ternary();
-    [[nodiscard]] ast::Expr parse_logical_or();
-    [[nodiscard]] ast::Expr parse_logical_and();
-    [[nodiscard]] ast::Expr parse_equality();
-    [[nodiscard]] ast::Expr parse_relational();
-    [[nodiscard]] ast::Expr parse_additive();
-    [[nodiscard]] ast::Expr parse_multiplicative();
+
+    /**
+     * @brief Parse the left-associative binary operator ladder via precedence climbing.
+     * @param min_precedence The lowest operator precedence this call is allowed to consume; a lower-precedence
+     *        operator is left for an enclosing call to handle.
+     */
+    [[nodiscard]] ast::Expr parse_binary(int min_precedence);
+
     [[nodiscard]] ast::Expr parse_unary();
     [[nodiscard]] ast::Expr parse_postfix();
     [[nodiscard]] ast::Expr parse_primary();

@@ -7,6 +7,7 @@ add_library(${PROJECT_NAME}
         src/token_lookahead.cpp
         src/token_reader.cpp
         src/lexer.cpp
+        src/binary_operator.cpp
         src/parser.cpp
 )
 

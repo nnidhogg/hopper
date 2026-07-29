@@ -38,6 +38,16 @@ std::string operator_symbol(const ast::Binary_op op)
         return "==";
     case ast::Binary_op::Not_equal:
         return "!=";
+    case ast::Binary_op::Shift_left:
+        return "<<";
+    case ast::Binary_op::Shift_right:
+        return ">>";
+    case ast::Binary_op::Bitwise_and:
+        return "&";
+    case ast::Binary_op::Bitwise_xor:
+        return "^";
+    case ast::Binary_op::Bitwise_or:
+        return "|";
     case ast::Binary_op::Logical_and:
         return "&&";
     case ast::Binary_op::Logical_or:
@@ -57,6 +67,8 @@ std::string operator_symbol(const ast::Unary_op op)
         return "-";
     case ast::Unary_op::Not:
         return "!";
+    case ast::Unary_op::Bitwise_not:
+        return "~";
     }
 
     return "?";
@@ -389,6 +401,67 @@ TEST(Parser_test, Relational_binds_tighter_than_equality)
 TEST(Parser_test, Additive_binds_tighter_than_relational)
 {
     EXPECT_EQ(to_string(parse("1 + 2 < 3")), "((1+2)<3)");
+}
+
+TEST(Parser_test, Shift_operators)
+{
+    EXPECT_EQ(to_string(parse("1 << 2")), "(1<<2)");
+    EXPECT_EQ(to_string(parse("1 >> 2")), "(1>>2)");
+}
+
+TEST(Parser_test, Shift_is_left_associative)
+{
+    EXPECT_EQ(to_string(parse("1 << 2 << 3")), "((1<<2)<<3)");
+}
+
+TEST(Parser_test, Additive_binds_tighter_than_shift)
+{
+    EXPECT_EQ(to_string(parse("1 + 2 << 3")), "((1+2)<<3)");
+}
+
+TEST(Parser_test, Shift_binds_tighter_than_relational)
+{
+    EXPECT_EQ(to_string(parse("1 << 2 < 3")), "((1<<2)<3)");
+}
+
+TEST(Parser_test, Bitwise_operators)
+{
+    EXPECT_EQ(to_string(parse("1 & 2")), "(1&2)");
+    EXPECT_EQ(to_string(parse("1 ^ 2")), "(1^2)");
+    EXPECT_EQ(to_string(parse("1 | 2")), "(1|2)");
+    EXPECT_EQ(to_string(parse("~1")), "(~1)");
+}
+
+TEST(Parser_test, Bitwise_operators_are_left_associative)
+{
+    EXPECT_EQ(to_string(parse("1 & 2 & 3")), "((1&2)&3)");
+    EXPECT_EQ(to_string(parse("1 ^ 2 ^ 3")), "((1^2)^3)");
+    EXPECT_EQ(to_string(parse("1 | 2 | 3")), "((1|2)|3)");
+}
+
+TEST(Parser_test, Bitwise_and_binds_tighter_than_bitwise_xor)
+{
+    EXPECT_EQ(to_string(parse("1 ^ 2 & 3")), "(1^(2&3))");
+}
+
+TEST(Parser_test, Bitwise_xor_binds_tighter_than_bitwise_or)
+{
+    EXPECT_EQ(to_string(parse("1 | 2 ^ 3")), "(1|(2^3))");
+}
+
+TEST(Parser_test, Equality_binds_tighter_than_bitwise_and)
+{
+    EXPECT_EQ(to_string(parse("1 & 2 == 3")), "(1&(2==3))");
+}
+
+TEST(Parser_test, Bitwise_or_binds_tighter_than_logical_and)
+{
+    EXPECT_EQ(to_string(parse("1 | 2 && 3")), "((1|2)&&3)");
+}
+
+TEST(Parser_test, Bitwise_not_binds_tighter_than_bitwise_and)
+{
+    EXPECT_EQ(to_string(parse("~1 & 2")), "((~1)&2)");
 }
 
 TEST(Parser_test, Logical_operators_and_precedence)
