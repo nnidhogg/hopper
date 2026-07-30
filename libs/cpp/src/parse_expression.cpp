@@ -156,6 +156,28 @@ ast::Expr Parser::parse_unary()
         return make_unary(ast::Unary_op::Bitwise_not, parse_unary());
     }
 
+    if (accept(Token_kind::Plus_plus))
+    {
+        return make_unary(ast::Unary_op::Pre_increment, parse_unary());
+    }
+
+    if (accept(Token_kind::Minus_minus))
+    {
+        return make_unary(ast::Unary_op::Pre_decrement, parse_unary());
+    }
+
+    // '&' and '*' are prefix operators here and binary operators after a left operand; the position decides,
+    // exactly as in C++.
+    if (accept(Token_kind::Amp))
+    {
+        return make_unary(ast::Unary_op::Address_of, parse_unary());
+    }
+
+    if (accept(Token_kind::Star))
+    {
+        return make_unary(ast::Unary_op::Dereference, parse_unary());
+    }
+
     return parse_postfix();
 }
 

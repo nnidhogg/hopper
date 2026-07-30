@@ -19,6 +19,10 @@ enum class Unary_op
     Minus,
     Not,
     Bitwise_not,
+    Pre_increment,
+    Pre_decrement,
+    Address_of,
+    Dereference,
 };
 
 /**

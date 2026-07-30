@@ -19,7 +19,8 @@ namespace hopper::cpp
  * @brief Recursive-descent, precedence-climbing parser for a subset of C++.
  *
  * Expressions cover primaries (literals, identifiers, parenthesized subexpressions), postfix operators (calls,
- * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`/`~`, the multiplicative/additive/shift/relational/equality/
+ * `.`, `->`, `[]`, `++`, `--`), unary `+`/`-`/`!`/`~`/`++`/`--`/`&`/`*` (address-of and dereference), the
+ * multiplicative/additive/shift/relational/equality/
  * bitwise-and/bitwise-xor/bitwise-or/logical-and/logical-or binary ladder (all left-associative, implemented as one
  * precedence-table-driven parse_binary() rather than one function per level), the ternary conditional, and
  * assignment (both right-associative). Statements cover the expression statement, the empty statement, compound

@@ -69,6 +69,14 @@ std::string operator_symbol(const ast::Unary_op op)
         return "!";
     case ast::Unary_op::Bitwise_not:
         return "~";
+    case ast::Unary_op::Pre_increment:
+        return "++";
+    case ast::Unary_op::Pre_decrement:
+        return "--";
+    case ast::Unary_op::Address_of:
+        return "&";
+    case ast::Unary_op::Dereference:
+        return "*";
     }
 
     return "?";
@@ -448,8 +456,10 @@ TEST(Parser_test, Unary_binds_tighter_than_multiplicative)
 TEST(Parser_test, Maximal_munch_prefers_the_longest_operator_token)
 {
     // "--5" lexes as a single Minus_minus token followed by "5", exactly as in real C++ (where this is the classic
-    // reason "a---b" means "a-- -b", not "a - --b"). There is no prefix -- in this grammar, so it's a syntax error.
-    EXPECT_THROW(parse("--5"), std::runtime_error);
+    // reason "a---b" means "a-- -b", not "a - --b"). With prefix decrement in the grammar it therefore parses as
+    // one prefix operator, not as two nested negations; the spaced spelling still yields the negations.
+    EXPECT_EQ(to_string(parse("--5")), "(--5)");
+    EXPECT_EQ(to_string(parse("- -5")), "(-(-5))");
 }
 
 TEST(Parser_test, Call_with_no_arguments)
@@ -1031,4 +1041,41 @@ TEST(Parser_test, Throws_on_malformed_functions)
     EXPECT_THROW(parse_unit("int f(int a { return a; }"), std::runtime_error);
     EXPECT_THROW(parse_unit("int f() { return 0; } }"), std::runtime_error);
     EXPECT_THROW(parse_unit(";"), std::runtime_error);
+}
+
+TEST(Parser_test, Prefix_increment_and_decrement)
+{
+    EXPECT_EQ(to_string(parse("++x")), "(++x)");
+    EXPECT_EQ(to_string(parse("--x")), "(--x)");
+    EXPECT_EQ(to_string(parse("++++x")), "(++(++x))");
+}
+
+TEST(Parser_test, Address_of_and_dereference)
+{
+    EXPECT_EQ(to_string(parse("&x")), "(&x)");
+    EXPECT_EQ(to_string(parse("*p")), "(*p)");
+    EXPECT_EQ(to_string(parse("**pp")), "(*(*pp))");
+    EXPECT_EQ(to_string(parse("&*p")), "(&(*p))");
+}
+
+TEST(Parser_test, Prefix_operators_bind_looser_than_postfix)
+{
+    EXPECT_EQ(to_string(parse("*p++")), "(*(p++))");
+    EXPECT_EQ(to_string(parse("++a[0]")), "(++(a[0]))");
+    EXPECT_EQ(to_string(parse("&object.field")), "(&(object.field))");
+}
+
+TEST(Parser_test, Position_decides_between_unary_and_binary_star_and_amp)
+{
+    EXPECT_EQ(to_string(parse("a * b")), "(a*b)");
+    EXPECT_EQ(to_string(parse("a * *b")), "(a*(*b))");
+    EXPECT_EQ(to_string(parse("a & &b")), "(a&(&b))");
+    EXPECT_EQ(to_string(parse("*a * *b")), "((*a)*(*b))");
+}
+
+TEST(Parser_test, Dereference_in_statements_and_loops)
+{
+    EXPECT_EQ(to_string(parse_stmt("*p = *q + 1;")), "((*p)=((*q)+1));");
+    EXPECT_EQ(to_string(parse_stmt("for (int i = 0; i < n; ++i) f(i);")), "for(int i=0;(i<n);(++i)){f(i);}");
+    EXPECT_EQ(to_string(parse_stmt("int* p = &x;")), "int *p=(&x);");
 }
