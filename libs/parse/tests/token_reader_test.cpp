@@ -124,6 +124,34 @@ TEST(Token_reader_test, Windows_newlines_are_one_token_and_offsets_stay_original
     EXPECT_TRUE(reader.next().end_of_input());
 }
 
+TEST(Token_reader_test, A_lone_carriage_return_counts_as_one_newline)
+{
+    // Classic Mac OS line endings: "a\rb" puts 'b' on line 2, exactly as the documented contract says, and a
+    // mixed input counts each style once.
+    Token_reader<Kind> reader{build_lexer(), std::string{"a\rb"}, skip_trivia};
+
+    EXPECT_EQ(reader.next().token().lexeme(), "a");
+
+    EXPECT_EQ(reader.next().token().lexeme(), "\r");
+
+    EXPECT_EQ(reader.next().token().lexeme(), "b");
+    EXPECT_EQ(reader.location().line(), 2U);
+    EXPECT_EQ(reader.location().column(), 1U);
+    EXPECT_EQ(reader.location().offset(), 2U);
+
+    Token_reader<Kind> mixed{build_lexer(), std::string{"a\nb\r\nc\rd"}, skip_trivia};
+
+    for (int newlines{0}; newlines < 6; ++newlines)
+    {
+        static_cast<void>(mixed.next());
+    }
+
+    EXPECT_EQ(mixed.next().token().lexeme(), "d");
+    EXPECT_EQ(mixed.location().line(), 4U);
+    EXPECT_EQ(mixed.location().column(), 1U);
+    EXPECT_EQ(mixed.location().offset(), 7U);
+}
+
 TEST(Token_reader_test, Location_tracks_lines_and_columns)
 {
     Token_reader<Kind> reader{build_lexer(), std::string{"one\ntwo"}, skip_trivia};

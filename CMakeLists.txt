@@ -13,6 +13,9 @@ else ()
     set(HOPPER_IS_TOP_LEVEL OFF)
 endif ()
 
+# hopper's own root for test data paths; CMAKE_SOURCE_DIR names the embedding project's root under add_subdirectory().
+set(HOPPER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # GCC-style flags; threading is carried by munch's targets, not by a global flag.
 add_compile_options(-Wall -Wunused -Wextra)
 
