@@ -141,8 +141,7 @@ private:
     /**
      * @brief Parse a function's parameter list and body (or prototype ';'), the return declarator already parsed.
      */
-    [[nodiscard]] ast::Function parse_function(ast::Type type, std::size_t pointers, bool reference,
-                                               std::string name);
+    [[nodiscard]] ast::Function parse_function(ast::Type type, std::size_t pointers, bool reference, std::string name);
 
     [[nodiscard]] ast::Parameter parse_parameter();
 };

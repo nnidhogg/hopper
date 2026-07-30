@@ -152,10 +152,7 @@ public:
     /**
      * @brief Access the location associated with the current token.
      */
-    [[nodiscard]] const Token_location& location() const noexcept
-    {
-        return lookahead_.location();
-    }
+    [[nodiscard]] const Token_location& location() const noexcept { return lookahead_.location(); }
 
 private:
     /**
@@ -197,10 +194,7 @@ private:
      * @return Normalized file contents as a std::string.
      * @throws std::runtime_error If the file cannot be opened.
      */
-    static std::string normalize(const std::filesystem::path& file)
-    {
-        return normalize(read(file));
-    }
+    static std::string normalize(const std::filesystem::path& file) { return normalize(read(file)); }
 
     /**
      * @brief Read the entire file contents into a string, in binary mode and without normalization.

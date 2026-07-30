@@ -33,8 +33,7 @@ protected:
     /**
      * @brief Construct the base around an existing token stream.
      */
-    explicit Parser_base(Token_reader<Kind> reader) : reader_{std::move(reader)}
-    {}
+    explicit Parser_base(Token_reader<Kind> reader) : reader_{std::move(reader)} {}
 
     ~Parser_base() = default;
 

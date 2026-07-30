@@ -287,8 +287,8 @@ std::string to_string(const ast::Stmt& stmt)
                 else if constexpr (std::is_same_v<Node_t, ast::For>)
                 {
                     // The init renders with its own trailing ';' in all three of its forms.
-                    return "for(" + to_string(*node.init) + (node.condition ? to_string(*node.condition) : "") +
-                           ";" + (node.step ? to_string(*node.step) : "") + "){" + to_string(*node.body) + "}";
+                    return "for(" + to_string(*node.init) + (node.condition ? to_string(*node.condition) : "") + ";" +
+                           (node.step ? to_string(*node.step) : "") + "){" + to_string(*node.body) + "}";
                 }
                 else if constexpr (std::is_same_v<Node_t, ast::Do_while>)
                 {
@@ -310,8 +310,9 @@ std::string to_string(const ast::Stmt& stmt)
 
 std::string to_string(const ast::Parameter& parameter)
 {
-    const auto declarator{std::string(parameter.pointers, '*') + (parameter.reference ? "&" : "") + parameter.name +
-                          (parameter.default_value ? "=" + to_string(*parameter.default_value) : "")};
+    const auto declarator{
+            std::string(parameter.pointers, '*') + (parameter.reference ? "&" : "") + parameter.name +
+            (parameter.default_value ? "=" + to_string(*parameter.default_value) : "")};
 
     return declarator.empty() ? type_name(parameter.type) : type_name(parameter.type) + " " + declarator;
 }
@@ -823,8 +824,9 @@ TEST(Parser_test, Return_statement)
 
 TEST(Parser_test, Statements_compose)
 {
-    EXPECT_EQ(to_string(parse_stmt("{ x = 0; while (x < 3) { x += 1; } if (x == 3) return x; else return 0; }")),
-              "{(x=0);while((x<3)){{(x+=1);}}if((x==3)){return x;}else{return 0;}}");
+    EXPECT_EQ(
+            to_string(parse_stmt("{ x = 0; while (x < 3) { x += 1; } if (x == 3) return x; else return 0; }")),
+            "{(x=0);while((x<3)){{(x+=1);}}if((x==3)){return x;}else{return 0;}}");
 }
 
 TEST(Parser_test, Throws_on_missing_statement_semicolon)
@@ -950,8 +952,9 @@ TEST(Parser_test, For_header_slots_are_independent)
 
 TEST(Parser_test, For_init_declares_multiple_variables)
 {
-    EXPECT_EQ(to_string(parse_stmt("for (int i = 0, n = limit(); i < n; i++) f(i);")),
-              "for(int i=0,n=limit();(i<n);(i++)){f(i);}");
+    EXPECT_EQ(
+            to_string(parse_stmt("for (int i = 0, n = limit(); i < n; i++) f(i);")),
+            "for(int i=0,n=limit();(i<n);(i++)){f(i);}");
 }
 
 TEST(Parser_test, For_bodies_nest)
@@ -966,8 +969,7 @@ TEST(Parser_test, Do_while)
 
 TEST(Parser_test, Do_while_with_block_body)
 {
-    EXPECT_EQ(to_string(parse_stmt("do { x = x + 1; f(x); } while (x < 10);")),
-              "do{{(x=(x+1));f(x);}}while((x<10));");
+    EXPECT_EQ(to_string(parse_stmt("do { x = x + 1; f(x); } while (x < 10);")), "do{{(x=(x+1));f(x);}}while((x<10));");
 }
 
 TEST(Parser_test, Throws_on_malformed_for)
@@ -997,8 +999,9 @@ TEST(Parser_test, Function_with_parameters)
 
 TEST(Parser_test, Function_prototype_with_pointer_shapes)
 {
-    EXPECT_EQ(to_string(parse_unit("const char* find(const char* haystack, char needle);")),
-              "const char *find(const char *haystack,char needle);");
+    EXPECT_EQ(
+            to_string(parse_unit("const char* find(const char* haystack, char needle);")),
+            "const char *find(const char *haystack,char needle);");
 }
 
 TEST(Parser_test, Function_parameters_may_be_unnamed_or_defaulted)
@@ -1013,8 +1016,9 @@ TEST(Parser_test, Function_returning_a_reference)
 
 TEST(Parser_test, Translation_unit_mixes_declarations_and_functions)
 {
-    EXPECT_EQ(to_string(parse_unit("int counter = 0; void tick(); int get() { return counter; }")),
-              "int counter=0;void tick();int get(){return counter;}");
+    EXPECT_EQ(
+            to_string(parse_unit("int counter = 0; void tick(); int get() { return counter; }")),
+            "int counter=0;void tick();int get(){return counter;}");
 }
 
 TEST(Parser_test, Translation_unit_holds_several_definitions)
@@ -1029,8 +1033,10 @@ TEST(Parser_test, Empty_translation_unit)
 
 TEST(Parser_test, Function_bodies_use_the_full_statement_grammar)
 {
-    EXPECT_EQ(to_string(parse_unit("int sum(int n) { int total = 0; for (int i = 0; i < n; i++) total += i; return total; }")),
-              "int sum(int n){int total=0;for(int i=0;(i<n);(i++)){(total+=i);}return total;}");
+    EXPECT_EQ(
+            to_string(parse_unit(
+                    "int sum(int n) { int total = 0; for (int i = 0; i < n; i++) total += i; return total; }")),
+            "int sum(int n){int total=0;for(int i=0;(i<n);(i++)){(total+=i);}return total;}");
 }
 
 TEST(Parser_test, Throws_on_malformed_functions)

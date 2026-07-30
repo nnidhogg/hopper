@@ -209,8 +209,9 @@ struct Expr
     /**
      * @brief The kinds of node an expression can be.
      */
-    using Node_t = std::variant<Int_literal, Float_literal, Bool_literal, Name, Unary, Postfix, Call, Member,
-                                 Subscript, Binary, Ternary, Assign>;
+    using Node_t = std::variant<
+            Int_literal, Float_literal, Bool_literal, Name, Unary, Postfix, Call, Member, Subscript, Binary, Ternary,
+            Assign>;
 
     /**
      * @brief The node this expression holds.

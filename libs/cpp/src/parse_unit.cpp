@@ -51,10 +51,11 @@ ast::Translation_unit::Item_t Parser::parse_external_declaration()
 
     std::vector<ast::Declarator> declarators;
 
-    declarators.push_back({.pointers = pointers,
-                           .reference = reference,
-                           .name = std::string{name.lexeme()},
-                           .initializer = std::move(initializer)});
+    declarators.push_back(
+            {.pointers = pointers,
+             .reference = reference,
+             .name = std::string{name.lexeme()},
+             .initializer = std::move(initializer)});
 
     while (accept(Token_kind::Comma))
     {
@@ -66,8 +67,8 @@ ast::Translation_unit::Item_t Parser::parse_external_declaration()
     return ast::Declaration{.type = type, .declarators = std::move(declarators)};
 }
 
-ast::Function Parser::parse_function(const ast::Type type, const std::size_t pointers, const bool reference,
-                                     std::string name)
+ast::Function Parser::parse_function(
+        const ast::Type type, const std::size_t pointers, const bool reference, std::string name)
 {
     expect(Token_kind::Left_paren, "'(' to open the parameter list");
 

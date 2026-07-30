@@ -34,28 +34,19 @@ public:
     /**
      * @brief Access the current lookahead token, if any.
      */
-    [[nodiscard]] const std::optional<Token_t>& token() const noexcept
-    {
-        return token_;
-    }
+    [[nodiscard]] const std::optional<Token_t>& token() const noexcept { return token_; }
 
     /**
      * @brief Access the location associated with the current token.
      */
-    [[nodiscard]] const Token_location& location() const noexcept
-    {
-        return location_;
-    }
+    [[nodiscard]] const Token_location& location() const noexcept { return location_; }
 
     /**
      * @brief Consume and clear the buffered token.
      *
      * Returns the currently stored token (if any) and resets the internal optional to an empty state.
      */
-    std::optional<Token_t> consume() noexcept
-    {
-        return std::exchange(token_, std::nullopt);
-    }
+    std::optional<Token_t> consume() noexcept { return std::exchange(token_, std::nullopt); }
 
     /**
      * @brief Reset the reading position to the beginning of the current input and clear the token.

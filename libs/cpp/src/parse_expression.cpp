@@ -241,13 +241,15 @@ ast::Expr Parser::parse_postfix()
         }
         else if (accept(Token_kind::Plus_plus))
         {
-            expr = {.node = ast::Postfix{.op = ast::Postfix_op::Increment,
-                                          .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+            expr = {.node = ast::Postfix{
+                            .op = ast::Postfix_op::Increment,
+                            .operand = std::make_unique<ast::Expr>(std::move(expr))}};
         }
         else if (accept(Token_kind::Minus_minus))
         {
-            expr = {.node = ast::Postfix{.op = ast::Postfix_op::Decrement,
-                                          .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+            expr = {.node = ast::Postfix{
+                            .op = ast::Postfix_op::Decrement,
+                            .operand = std::make_unique<ast::Expr>(std::move(expr))}};
         }
         else
         {
