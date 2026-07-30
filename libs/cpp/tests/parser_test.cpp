@@ -159,6 +159,14 @@ std::string to_string(const ast::Expr& expr)
                 {
                     return node.value ? "true" : "false";
                 }
+                else if constexpr (std::is_same_v<Node_t, ast::String_literal>)
+                {
+                    return "\"" + node.value + "\"";
+                }
+                else if constexpr (std::is_same_v<Node_t, ast::Char_literal>)
+                {
+                    return "'" + node.value + "'";
+                }
                 else if constexpr (std::is_same_v<Node_t, ast::Name>)
                 {
                     return node.identifier;
@@ -1084,4 +1092,71 @@ TEST(Parser_test, Dereference_in_statements_and_loops)
     EXPECT_EQ(to_string(parse_stmt("*p = *q + 1;")), "((*p)=((*q)+1));");
     EXPECT_EQ(to_string(parse_stmt("for (int i = 0; i < n; ++i) f(i);")), "for(int i=0;(i<n);(++i)){f(i);}");
     EXPECT_EQ(to_string(parse_stmt("int* p = &x;")), "int *p=(&x);");
+}
+
+TEST(Parser_test, String_literals)
+{
+    EXPECT_EQ(to_string(parse("\"hello\"")), "\"hello\"");
+    EXPECT_EQ(to_string(parse("\"\"")), "\"\"");
+
+    // Escape sequences stay exactly as written; decoding them is a semantic concern.
+    EXPECT_EQ(to_string(parse("\"a\\\"b\\n\"")), "\"a\\\"b\\n\"");
+
+    EXPECT_EQ(to_string(parse("f(\"x\", 1)")), "f(\"x\",1)");
+}
+
+TEST(Parser_test, Character_literals)
+{
+    EXPECT_EQ(to_string(parse("'x'")), "'x'");
+    EXPECT_EQ(to_string(parse("'\\n'")), "'\\n'");
+    EXPECT_EQ(to_string(parse("'\\''")), "'\\''");
+    EXPECT_EQ(to_string(parse("'a' + 'b'")), "('a'+'b')");
+}
+
+TEST(Parser_test, Hexadecimal_and_binary_integers)
+{
+    EXPECT_EQ(to_string(parse("0xFF")), "255");
+    EXPECT_EQ(to_string(parse("0x0")), "0");
+    EXPECT_EQ(to_string(parse("0b101")), "5");
+    EXPECT_EQ(to_string(parse("0xff + 0b1")), "(255+1)");
+}
+
+TEST(Parser_test, Comments_are_trivia)
+{
+    EXPECT_EQ(to_string(parse("1 // trailing comment")), "1");
+    EXPECT_EQ(to_string(parse("1 /* inline */ + /* another */ 2")), "(1+2)");
+    EXPECT_EQ(to_string(parse("/* leading\n   multiline */ 42")), "42");
+    EXPECT_EQ(to_string(parse("1 /* stars ** inside * */ + 2")), "(1+2)");
+    EXPECT_EQ(to_string(parse("/**/1")), "1");
+
+    // Division survives: a lone '/' is still an operator.
+    EXPECT_EQ(to_string(parse("a / b")), "(a/b)");
+}
+
+TEST(Parser_test, Literals_in_declarations)
+{
+    EXPECT_EQ(to_string(parse_stmt("const char* s = \"hi\";")), "const char *s=\"hi\";");
+    EXPECT_EQ(to_string(parse_stmt("char c = '\\t';")), "char c='\\t';");
+    EXPECT_EQ(to_string(parse_stmt("int mask = 0b11 & 0x0F;")), "int mask=(3&15);");
+}
+
+TEST(Parser_test, Throws_on_unterminated_literals_and_comments)
+{
+    EXPECT_THROW(parse("\"abc"), std::runtime_error);
+    EXPECT_THROW(parse("\"a\nb\""), std::runtime_error);
+    EXPECT_THROW(parse("'ab'"), std::runtime_error);
+    EXPECT_THROW(parse("/* never closed"), std::runtime_error);
+}
+
+TEST(Parser_test, Parses_a_realistic_source_file_end_to_end)
+{
+    Parser parser{build_lexer(), std::filesystem::path{std::string{SOURCE_DIR} + "/libs/cpp/tests/data/example.cpp"}};
+
+    const auto unit{parser.parse_translation_unit()};
+
+    // Five global declarations, one prototype, and four function definitions.
+    ASSERT_EQ(unit.items.size(), 10U);
+
+    EXPECT_TRUE(std::holds_alternative<ast::Function>(unit.items.back()));
+    EXPECT_EQ(std::get<ast::Function>(unit.items.back()).name, "main");
 }

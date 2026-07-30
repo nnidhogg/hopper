@@ -111,6 +111,27 @@ struct Bool_literal
 };
 
 /**
+ * @brief A string literal, e.g. `"hello\n"`.
+ *
+ * Holds the characters between the quotes with escape sequences left exactly as written; decoding them is a
+ * semantic concern.
+ */
+struct String_literal
+{
+    std::string value;
+};
+
+/**
+ * @brief A character literal, e.g. `'x'` or `'\n'`.
+ *
+ * Holds the character or escape between the quotes, undecoded, like String_literal.
+ */
+struct Char_literal
+{
+    std::string value;
+};
+
+/**
  * @brief A reference to a named entity, e.g. `x`.
  */
 struct Name
@@ -210,8 +231,8 @@ struct Expr
      * @brief The kinds of node an expression can be.
      */
     using Node_t = std::variant<
-            Int_literal, Float_literal, Bool_literal, Name, Unary, Postfix, Call, Member, Subscript, Binary, Ternary,
-            Assign>;
+            Int_literal, Float_literal, Bool_literal, String_literal, Char_literal, Name, Unary, Postfix, Call, Member,
+            Subscript, Binary, Ternary, Assign>;
 
     /**
      * @brief The node this expression holds.

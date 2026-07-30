@@ -19,6 +19,8 @@ enum class Token_kind : uint8_t
     // Literals and identifiers
     Integer_literal,
     Floating_point_literal,
+    String_literal,
+    Character_literal,
     Identifier,
     Keyword_true,
     Keyword_false,
@@ -90,6 +92,8 @@ enum class Token_kind : uint8_t
     // Trivia
     Whitespace,
     Newline,
+    Line_comment,
+    Block_comment,
 };
 
 /**
@@ -97,7 +101,8 @@ enum class Token_kind : uint8_t
  */
 [[nodiscard]] constexpr bool is_trivia(const Token_kind kind) noexcept
 {
-    return kind == Token_kind::Whitespace || kind == Token_kind::Newline;
+    return kind == Token_kind::Whitespace || kind == Token_kind::Newline || kind == Token_kind::Line_comment ||
+           kind == Token_kind::Block_comment;
 }
 
 } // namespace hopper::cpp

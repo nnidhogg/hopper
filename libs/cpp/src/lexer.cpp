@@ -39,6 +39,36 @@ munch::core::Lexer build_lexer()
     builder.add_token(patterns::decimal_float(), Token_kind::Floating_point_literal, 1);
     builder.add_token(patterns::decimal_integer(), Token_kind::Integer_literal, 1);
 
+    // Hexadecimal and binary integers share the integer token kind; the parser decodes by prefix. Maximal munch
+    // keeps "0x1F" one token rather than "0" followed by an identifier.
+    builder.add_token(
+            concat(text("0x"), plus(any_of(Set::digits() + Set::range('a', 'f') + Set::range('A', 'F')))),
+            Token_kind::Integer_literal, 1);
+    builder.add_token(concat(text("0b"), plus(any_of(Set{'0', '1'}))), Token_kind::Integer_literal, 1);
+
+    // A string literal body: any byte except the closing quote, a backslash, or a raw newline, with a backslash
+    // escape taking the next printable character verbatim; which escapes are meaningful is a semantic concern.
+    const auto escape{concat(text("\\"), any_of(Set::printable() + ' '))};
+
+    builder.add_token(
+            concat(text("\""), kleene(choice(any_of(Set::all() - '"' - '\\' - '\n' - '\r'), escape)), text("\"")),
+            Token_kind::String_literal, 1);
+
+    // A character literal holds exactly one character or escape; multicharacter literals are not covered.
+    builder.add_token(
+            concat(text("'"), choice(any_of(Set::all() - '\'' - '\\' - '\n' - '\r'), escape), text("'")),
+            Token_kind::Character_literal, 1);
+
+    // Comments are trivia: recognized as tokens here, discarded by the parser's skip predicate. The block comment
+    // is the classic automaton where a star run only closes the comment when '/' follows it.
+    builder.add_token(concat(text("//"), kleene(any_of(Set::all() - '\n'))), Token_kind::Line_comment, 1);
+
+    builder.add_token(
+            concat(text("/*"),
+                   kleene(choice(any_of(Set::all() - '*'), concat(plus(text("*")), any_of(Set::all() - '*' - '/')))),
+                   plus(text("*")), text("/")),
+            Token_kind::Block_comment, 1);
+
     builder.add_token(text("("), Token_kind::Left_paren, 1);
     builder.add_token(text(")"), Token_kind::Right_paren, 1);
     builder.add_token(text("["), Token_kind::Left_bracket, 1);

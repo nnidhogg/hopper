@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -262,8 +263,26 @@ ast::Expr Parser::parse_primary()
 {
     if (const auto token{accept(Token_kind::Integer_literal)}; token)
     {
+        auto lexeme{token->lexeme()};
+
+        // Hexadecimal and binary literals arrive with their prefix; from_chars expects the bare digits.
+        int base{10};
+
+        if (lexeme.starts_with("0x"))
+        {
+            base = 16;
+
+            lexeme.remove_prefix(2);
+        }
+        else if (lexeme.starts_with("0b"))
+        {
+            base = 2;
+
+            lexeme.remove_prefix(2);
+        }
+
         long long value{};
-        std::from_chars(token->lexeme().data(), token->lexeme().data() + token->lexeme().size(), value);
+        std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value, base);
 
         return {.node = ast::Int_literal{.value = value}};
     }
@@ -274,6 +293,20 @@ ast::Expr Parser::parse_primary()
         std::from_chars(token->lexeme().data(), token->lexeme().data() + token->lexeme().size(), value);
 
         return {.node = ast::Float_literal{.value = value}};
+    }
+
+    if (const auto token{accept(Token_kind::String_literal)}; token)
+    {
+        const auto lexeme{token->lexeme()};
+
+        return {.node = ast::String_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}}};
+    }
+
+    if (const auto token{accept(Token_kind::Character_literal)}; token)
+    {
+        const auto lexeme{token->lexeme()};
+
+        return {.node = ast::Char_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}}};
     }
 
     if (accept(Token_kind::Keyword_true))

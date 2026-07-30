@@ -25,7 +25,9 @@ This parsing library is actively developed and not yet feature-complete. The cor
 abstractions are still evolving.
 
 As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
-parser for a subset of C++ **expressions, statements, and translation units**. Expressions cover literals, identifiers, parenthesized
+parser for a subset of C++ **expressions, statements, and translation units**. Literals cover integers (decimal,
+hexadecimal, binary), floating point, booleans, strings with escape sequences, and characters; line and block comments
+are recognized and discarded as trivia. Expressions cover literals, identifiers, parenthesized
 subexpressions, unary operators (`+`, `-`, `!`, `~`, prefix `++`/`--`, address-of `&`, dereference `*`), postfix
 operators (calls, `.`, `->`, `[]`, `++`, `--`), the
 standard left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
@@ -35,8 +37,9 @@ statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to
 with a declaration, expression, or empty init-statement, `do`/`while`, `return`, and declarations: a possibly
 const-qualified fundamental type followed by comma-separated pointer/reference declarators with optional
 initializers. Translation units parse as a sequence of function definitions, function prototypes, and variable
-declarations, with parameters carrying the same type and declarator shapes plus optional defaults. Casts are not
-covered yet.
+declarations, with parameters carrying the same type and declarator shapes plus optional defaults. A realistic source
+file exercising the whole subset parses end to end in the test suite. Casts, raw strings, numeric suffixes, and digit
+separators are not covered yet.
 
 This serves as both a **reference implementation** and a **validation** of the library's design and usability.
 
