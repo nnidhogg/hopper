@@ -138,6 +138,11 @@ private:
     [[nodiscard]] ast::Type parse_type_specifier();
 
     /**
+     * @brief Parse a complete type as a cast target: a specifier with its pointer and reference shape.
+     */
+    [[nodiscard]] ast::Type_id parse_type_id();
+
+    /**
      * @brief Parse one declarator: pointers, an optional reference, the name, and an optional initializer.
      */
     [[nodiscard]] ast::Declarator parse_declarator();

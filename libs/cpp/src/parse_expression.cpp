@@ -68,6 +68,26 @@ std::optional<ast::Assign_op> assign_operator_for(const Token_kind kind)
     }
 }
 
+/**
+ * @brief The cast kind a token selects, if it is one of the four cast keywords.
+ */
+std::optional<ast::Cast_kind> cast_kind_for(const Token_kind kind)
+{
+    switch (kind)
+    {
+    case Token_kind::Keyword_static_cast:
+        return ast::Cast_kind::Static;
+    case Token_kind::Keyword_dynamic_cast:
+        return ast::Cast_kind::Dynamic;
+    case Token_kind::Keyword_const_cast:
+        return ast::Cast_kind::Const;
+    case Token_kind::Keyword_reinterpret_cast:
+        return ast::Cast_kind::Reinterpret;
+    default:
+        return std::nullopt;
+    }
+}
+
 } // namespace
 
 ast::Expr Parser::parse_assignment()
@@ -379,6 +399,34 @@ ast::Expr Parser::parse_primary()
     if (const auto token{accept(Token_kind::Identifier)}; token)
     {
         return {.node = ast::Name{.identifier = std::string{token->lexeme()}}, .span = span_from(begin)};
+    }
+
+    if (const auto token{peek_token()}; token)
+    {
+        if (const auto kind{cast_kind_for(token->kind())}; kind)
+        {
+            (void)next_token();
+
+            expect(Token_kind::Less, "'<' after the cast keyword");
+
+            auto type{parse_type_id()};
+
+            expect(Token_kind::Greater, "'>' to close the cast type");
+
+            expect(Token_kind::Left_paren, "'(' to open the cast operand");
+
+            auto operand{parse_assignment()};
+
+            expect(Token_kind::Right_paren, "')' to close the cast operand");
+
+            return {.node =
+                            ast::Cast{
+                                    .kind = *kind,
+                                    .type = type,
+                                    .operand = std::make_unique<ast::Expr>(std::move(operand)),
+                            },
+                    .span = span_from(begin)};
+        }
     }
 
     if (accept(Token_kind::Left_paren))

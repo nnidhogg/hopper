@@ -38,9 +38,10 @@ statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to
 with a declaration, expression, or empty init-statement, `do`/`while`, `return`, and declarations: a possibly
 const-qualified fundamental type followed by comma-separated pointer/reference declarators with optional
 initializers. Translation units parse as a sequence of function definitions, function prototypes, and variable
-declarations, with parameters carrying the same type and declarator shapes plus optional defaults. A realistic source
-file exercising the whole subset parses end to end in the test suite. Casts, raw strings, numeric suffixes, and digit
-separators are not covered yet.
+declarations, with parameters carrying the same type and declarator shapes plus optional defaults. Expressions also
+cover the four named casts (`static_cast<const char**&>(value)` and friends) over the same type shapes declarations
+use. A realistic source file exercising the whole subset parses end to end in the test suite. Raw strings, numeric
+suffixes, and digit separators are not covered yet.
 
 This serves as both a **reference implementation** and a **validation** of the library's design and usability.
 

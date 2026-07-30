@@ -7,33 +7,10 @@
 #include <vector>
 
 #include "hopper/cpp/ast/expr.hpp"
+#include "hopper/cpp/ast/type.hpp"
 
 namespace hopper::cpp::ast
 {
-/**
- * @brief A fundamental type name.
- */
-enum class Type_kind
-{
-    Bool,
-    Char,
-    Int,
-    Float,
-    Double,
-    Void,
-};
-
-/**
- * @brief A type specifier: a fundamental type with an optional const qualifier.
- *
- * The qualifier's spelling position (`const int` or `int const`) is not preserved; both name the same type.
- */
-struct Type
-{
-    bool is_const;
-    Type_kind kind;
-};
-
 /**
  * @brief One declared entity, e.g. `**&name = value` within a declaration.
  *

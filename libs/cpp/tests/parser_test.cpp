@@ -139,6 +139,56 @@ std::string operator_symbol(const ast::Assign_op op)
     return "?";
 }
 
+std::string cast_keyword(const ast::Cast_kind kind)
+{
+    switch (kind)
+    {
+    case ast::Cast_kind::Static:
+        return "static_cast";
+    case ast::Cast_kind::Dynamic:
+        return "dynamic_cast";
+    case ast::Cast_kind::Const:
+        return "const_cast";
+    default:
+        return "reinterpret_cast";
+    }
+}
+
+std::string type_name(const ast::Type_kind kind)
+{
+    switch (kind)
+    {
+    case ast::Type_kind::Bool:
+        return "bool";
+    case ast::Type_kind::Char:
+        return "char";
+    case ast::Type_kind::Int:
+        return "int";
+    case ast::Type_kind::Float:
+        return "float";
+    case ast::Type_kind::Double:
+        return "double";
+    default:
+        return "void";
+    }
+}
+
+std::string to_string(const ast::Type_id& type)
+{
+    std::string result{type.type.is_const ? "const " : ""};
+
+    result += type_name(type.type.kind);
+
+    result.append(type.pointers, '*');
+
+    if (type.reference)
+    {
+        result += '&';
+    }
+
+    return result;
+}
+
 // Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly
 // in the expected string rather than in a deeply nested chain of std::get<> assertions.
 std::string to_string(const ast::Expr& expr)
@@ -207,11 +257,15 @@ std::string to_string(const ast::Expr& expr)
                     return "(" + to_string(*node.condition) + "?" + to_string(*node.then_branch) + ":" +
                            to_string(*node.else_branch) + ")";
                 }
+                else if constexpr (std::is_same_v<Node_t, ast::Assign>)
+                {
+                    return "(" + to_string(*node.target) + operator_symbol(node.op) + to_string(*node.value) + ")";
+                }
                 else
                 {
-                    static_assert(std::is_same_v<Node_t, ast::Assign>);
+                    static_assert(std::is_same_v<Node_t, ast::Cast>);
 
-                    return "(" + to_string(*node.target) + operator_symbol(node.op) + to_string(*node.value) + ")";
+                    return cast_keyword(node.kind) + "<" + to_string(node.type) + ">(" + to_string(*node.operand) + ")";
                 }
             },
             expr.node);
@@ -1252,7 +1306,7 @@ public:
             return leaf();
         }
 
-        switch (next() % 7)
+        switch (next() % 8)
         {
         case 0:
         {
@@ -1297,6 +1351,22 @@ public:
                     .member = identifiers_[next() % 4]});
         case 5:
             return wrap(ast::Subscript{.object = boxed(expression(depth - 1)), .index = boxed(expression(depth - 1))});
+        case 6:
+        {
+            constexpr ast::Cast_kind kinds[]{
+                    ast::Cast_kind::Static, ast::Cast_kind::Dynamic, ast::Cast_kind::Const,
+                    ast::Cast_kind::Reinterpret};
+
+            constexpr ast::Type_kind types[]{ast::Type_kind::Char, ast::Type_kind::Int, ast::Type_kind::Double};
+
+            return wrap(ast::Cast{
+                    .kind = kinds[next() % 4],
+                    .type =
+                            {.type = {.is_const = next() % 2 == 0, .kind = types[next() % 3]},
+                             .pointers = next() % 3,
+                             .reference = next() % 2 == 0},
+                    .operand = boxed(expression(depth - 1))});
+        }
         default:
             return wrap(ast::Assign{
                     .op = next() % 2 == 0 ? ast::Assign_op::Assign : ast::Assign_op::Add,
@@ -1371,4 +1441,60 @@ TEST(Parser_test, One_parser_serves_many_inputs)
     EXPECT_EQ(std::get<ast::Declaration>(first.items.front().node).declarators.front().name, "a");
 
     EXPECT_EQ(to_string(parse("0X1f + 0B11")), "(31+3)");
+}
+
+TEST(Parser_test, Parses_each_named_cast)
+{
+    const std::pair<const char*, ast::Cast_kind> casts[]{
+            {"static_cast<int>(x)", ast::Cast_kind::Static},
+            {"dynamic_cast<int>(x)", ast::Cast_kind::Dynamic},
+            {"const_cast<int>(x)", ast::Cast_kind::Const},
+            {"reinterpret_cast<int>(x)", ast::Cast_kind::Reinterpret},
+    };
+
+    for (const auto& [source, kind] : casts)
+    {
+        const auto expression{parse(source)};
+
+        const auto& cast{std::get<ast::Cast>(expression.node)};
+
+        EXPECT_EQ(cast.kind, kind) << source;
+        EXPECT_EQ(cast.type.type.kind, ast::Type_kind::Int) << source;
+        EXPECT_EQ(std::get<ast::Name>(cast.operand->node).identifier, "x") << source;
+    }
+}
+
+TEST(Parser_test, Parses_the_cast_type_shape)
+{
+    const auto expression{parse("reinterpret_cast<const char**&>(p)")};
+
+    const auto& cast{std::get<ast::Cast>(expression.node)};
+
+    EXPECT_TRUE(cast.type.type.is_const);
+    EXPECT_EQ(cast.type.type.kind, ast::Type_kind::Char);
+    EXPECT_EQ(cast.type.pointers, 2U);
+    EXPECT_TRUE(cast.type.reference);
+}
+
+TEST(Parser_test, Casts_chain_with_postfix_operators)
+{
+    EXPECT_EQ(to_string(parse("static_cast<int*>(p)[2]")), "(static_cast<int*>(p)[2])");
+
+    EXPECT_EQ(to_string(parse("-const_cast<int>(x) + 1")), "((-const_cast<int>(x))+1)");
+}
+
+TEST(Parser_test, Cast_spans_cover_keyword_to_closing_paren)
+{
+    const auto expression{parse("static_cast<int>(x + 1)")};
+
+    EXPECT_EQ(expression.span.begin.offset, 0U);
+    EXPECT_EQ(expression.span.end.offset, 23U);
+}
+
+TEST(Parser_test, Malformed_casts_are_syntax_errors)
+{
+    EXPECT_THROW(static_cast<void>(parse("static_cast int>(x)")), hopper::parse::Parse_error);
+    EXPECT_THROW(static_cast<void>(parse("static_cast<int>x")), hopper::parse::Parse_error);
+    EXPECT_THROW(static_cast<void>(parse("static_cast<>(x)")), hopper::parse::Parse_error);
+    EXPECT_THROW(static_cast<void>(parse("static_cast<int>(x")), hopper::parse::Parse_error);
 }

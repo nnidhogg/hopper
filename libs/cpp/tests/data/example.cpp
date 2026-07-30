@@ -67,5 +67,8 @@ int main()
     int* cursor = &total;
     *cursor = *cursor + 1;
 
+    double scaled = total / 3.0;
+    total = total + static_cast<int>(scaled);
+
     return classify(total) >= 0 ? 0 : 1;
 }

@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "hopper/cpp/ast/type.hpp"
 #include "hopper/parse/source_span.hpp"
 
 namespace hopper::cpp::ast
@@ -188,6 +189,30 @@ struct Subscript
 };
 
 /**
+ * @brief The four named casts.
+ */
+enum class Cast_kind
+{
+    Static,
+    Dynamic,
+    Const,
+    Reinterpret,
+};
+
+/**
+ * @brief A named cast, e.g. `static_cast<int>(value)`.
+ *
+ * Syntactic only, like the rest of the tree: whether the cast is meaningful for the types involved is a semantic
+ * concern.
+ */
+struct Cast
+{
+    Cast_kind kind;
+    Type_id type;
+    std::unique_ptr<Expr> operand;
+};
+
+/**
  * @brief An infix operator applied to two operands, e.g. `a + b`.
  *
  * Left-associative for every operator in this grammar's precedence ladder.
@@ -234,7 +259,7 @@ struct Expr
      */
     using Node_t = std::variant<
             Int_literal, Float_literal, Bool_literal, String_literal, Char_literal, Name, Unary, Postfix, Call, Member,
-            Subscript, Binary, Ternary, Assign>;
+            Subscript, Binary, Ternary, Assign, Cast>;
 
     /**
      * @brief The node this expression holds.

@@ -94,6 +94,22 @@ ast::Type Parser::parse_type_specifier()
     return {.is_const = is_const, .kind = *kind};
 }
 
+ast::Type_id Parser::parse_type_id()
+{
+    const auto type{parse_type_specifier()};
+
+    std::size_t pointers{0};
+
+    while (accept(Token_kind::Star))
+    {
+        ++pointers;
+    }
+
+    const bool reference{accept(Token_kind::Amp).has_value()};
+
+    return {.type = type, .pointers = pointers, .reference = reference};
+}
+
 ast::Declarator Parser::parse_declarator()
 {
     std::size_t pointers{0};

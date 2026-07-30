@@ -39,6 +39,10 @@ enum class Token_kind : uint8_t
     Keyword_float,
     Keyword_double,
     Keyword_void,
+    Keyword_static_cast,
+    Keyword_dynamic_cast,
+    Keyword_const_cast,
+    Keyword_reinterpret_cast,
 
     // Grouping, calls, member access, subscript, and the ternary operator
     Left_paren,

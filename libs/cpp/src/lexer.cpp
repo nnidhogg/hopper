@@ -32,6 +32,10 @@ munch::core::Lexer build_lexer()
     builder.add_token(text("float"), Token_kind::Keyword_float, 1);
     builder.add_token(text("double"), Token_kind::Keyword_double, 1);
     builder.add_token(text("void"), Token_kind::Keyword_void, 1);
+    builder.add_token(text("static_cast"), Token_kind::Keyword_static_cast, 1);
+    builder.add_token(text("dynamic_cast"), Token_kind::Keyword_dynamic_cast, 1);
+    builder.add_token(text("const_cast"), Token_kind::Keyword_const_cast, 1);
+    builder.add_token(text("reinterpret_cast"), Token_kind::Keyword_reinterpret_cast, 1);
 
     builder.add_token(patterns::identifier(), Token_kind::Identifier, 2);
 
