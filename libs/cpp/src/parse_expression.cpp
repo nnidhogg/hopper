@@ -309,13 +309,13 @@ ast::Expr Parser::parse_primary()
         // Hexadecimal and binary literals arrive with their prefix; from_chars expects the bare digits.
         int base{10};
 
-        if (lexeme.starts_with("0x"))
+        if (lexeme.starts_with("0x") || lexeme.starts_with("0X"))
         {
             base = 16;
 
             lexeme.remove_prefix(2);
         }
-        else if (lexeme.starts_with("0b"))
+        else if (lexeme.starts_with("0b") || lexeme.starts_with("0B"))
         {
             base = 2;
 

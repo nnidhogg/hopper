@@ -26,6 +26,7 @@ target_link_libraries(${PROJECT_NAME}
 
 if (HOPPER_BUILD_TESTS)
     add_executable(${PROJECT_NAME}_tests
+            tests/lexer_test.cpp
             tests/parser_test.cpp
     )
 

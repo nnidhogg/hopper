@@ -1352,3 +1352,23 @@ TEST(Parser_test, Generated_expressions_round_trip_through_print_and_reparse)
         ASSERT_EQ(to_string(reparsed), printed) << "iteration " << index;
     }
 }
+
+TEST(Parser_test, One_parser_serves_many_inputs)
+{
+    Parser parser{build_lexer(), std::string{"int a = 1;"}};
+
+    const auto first{parser.parse_translation_unit()};
+
+    ASSERT_EQ(first.items.size(), 1U);
+
+    parser.load(std::string{"void f(); void g();"});
+
+    const auto second{parser.parse_translation_unit()};
+
+    EXPECT_EQ(second.items.size(), 2U);
+
+    // The first unit owns its strings, so replacing the input did not invalidate it.
+    EXPECT_EQ(std::get<ast::Declaration>(first.items.front().node).declarators.front().name, "a");
+
+    EXPECT_EQ(to_string(parse("0X1f + 0B11")), "(31+3)");
+}

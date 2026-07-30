@@ -42,9 +42,11 @@ munch::core::Lexer build_lexer()
     // Hexadecimal and binary integers share the integer token kind; the parser decodes by prefix. Maximal munch
     // keeps "0x1F" one token rather than "0" followed by an identifier.
     builder.add_token(
-            concat(text("0x"), plus(any_of(Set::digits() + Set::range('a', 'f') + Set::range('A', 'F')))),
+            concat(choice(text("0x"), text("0X")),
+                   plus(any_of(Set::digits() + Set::range('a', 'f') + Set::range('A', 'F')))),
             Token_kind::Integer_literal, 1);
-    builder.add_token(concat(text("0b"), plus(any_of(Set{'0', '1'}))), Token_kind::Integer_literal, 1);
+    builder.add_token(
+            concat(choice(text("0b"), text("0B")), plus(any_of(Set{'0', '1'}))), Token_kind::Integer_literal, 1);
 
     // A string literal body: any byte except the closing quote, a backslash, or a raw newline, with a backslash
     // escape taking the next printable character verbatim; which escapes are meaningful is a semantic concern.
