@@ -20,9 +20,10 @@ parser hops from token to token is the pun.
 
 ## **Status: Work in Progress**
 
-This parsing library is actively developed and not yet feature-complete. The core components: **token streaming**,
-**lookahead**, **source location tracking**, and **structured error reporting** are stable, but higher-level
-abstractions are still evolving.
+This parsing library is actively developed and not yet feature-complete. The core components are stable: **token
+streaming** with lookahead, **source tracking** (every AST node carries the span it was parsed from, with offsets
+indexing the original bytes on any platform's line endings), and **structured errors** (`parse::Parse_error` with a
+kind and the span it points at). Higher-level abstractions are still evolving.
 
 As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
 parser for a subset of C++ **expressions, statements, and translation units**. Literals cover integers (decimal,

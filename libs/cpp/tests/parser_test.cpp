@@ -1231,3 +1231,124 @@ TEST(Parser_test, Block_spans_cover_their_braces)
     EXPECT_EQ(compound.statements.front().span.begin.offset, 2U);
     EXPECT_EQ(compound.statements.back().span.end.offset, 7U);
 }
+
+namespace
+{
+/**
+ * @brief Builds random expression ASTs from a fixed seed, for the print-and-reparse round trip.
+ *
+ * Every shape the renderer prints unambiguously is generated; spans are left empty, which the round trip ignores
+ * because it compares printed forms.
+ */
+class Expr_generator
+{
+public:
+    explicit Expr_generator(const unsigned seed) : seed_{seed} {}
+
+    ast::Expr expression(const int depth)
+    {
+        if (depth == 0 || next() % 4 == 0)
+        {
+            return leaf();
+        }
+
+        switch (next() % 7)
+        {
+        case 0:
+        {
+            constexpr ast::Binary_op ops[]{ast::Binary_op::Add,         ast::Binary_op::Subtract,
+                                           ast::Binary_op::Multiply,    ast::Binary_op::Less,
+                                           ast::Binary_op::Equal,       ast::Binary_op::Shift_left,
+                                           ast::Binary_op::Bitwise_and, ast::Binary_op::Logical_or};
+
+            return wrap(ast::Binary{
+                    .op = ops[next() % 8],
+                    .lhs = boxed(expression(depth - 1)),
+                    .rhs = boxed(expression(depth - 1))});
+        }
+        case 1:
+        {
+            constexpr ast::Unary_op ops[]{
+                    ast::Unary_op::Minus, ast::Unary_op::Not, ast::Unary_op::Bitwise_not, ast::Unary_op::Dereference,
+                    ast::Unary_op::Address_of};
+
+            return wrap(ast::Unary{.op = ops[next() % 5], .operand = boxed(expression(depth - 1))});
+        }
+        case 2:
+            return wrap(ast::Ternary{
+                    .condition = boxed(expression(depth - 1)),
+                    .then_branch = boxed(expression(depth - 1)),
+                    .else_branch = boxed(expression(depth - 1))});
+        case 3:
+        {
+            std::vector<ast::Expr> arguments;
+
+            for (auto count{next() % 3}; count > 0; --count)
+            {
+                arguments.push_back(expression(depth - 1));
+            }
+
+            return wrap(ast::Call{.callee = boxed(name()), .arguments = std::move(arguments)});
+        }
+        case 4:
+            return wrap(ast::Member{
+                    .op = next() % 2 == 0 ? ast::Member_op::Dot : ast::Member_op::Arrow,
+                    .object = boxed(expression(depth - 1)),
+                    .member = identifiers_[next() % 4]});
+        case 5:
+            return wrap(ast::Subscript{.object = boxed(expression(depth - 1)), .index = boxed(expression(depth - 1))});
+        default:
+            return wrap(ast::Assign{
+                    .op = next() % 2 == 0 ? ast::Assign_op::Assign : ast::Assign_op::Add,
+                    .target = boxed(expression(depth - 1)),
+                    .value = boxed(expression(depth - 1))});
+        }
+    }
+
+private:
+    unsigned next() { return seed_ = seed_ * 1664525U + 1013904223U, seed_ >> 16U; }
+
+    static ast::Expr wrap(auto node) { return {.node = std::move(node)}; }
+
+    static std::unique_ptr<ast::Expr> boxed(ast::Expr expr) { return std::make_unique<ast::Expr>(std::move(expr)); }
+
+    ast::Expr name() { return wrap(ast::Name{.identifier = identifiers_[next() % 4]}); }
+
+    ast::Expr leaf()
+    {
+        switch (next() % 3)
+        {
+        case 0:
+            return wrap(ast::Int_literal{.value = static_cast<long long>(next() % 1000)});
+        case 1:
+            return wrap(ast::Bool_literal{.value = next() % 2 == 0});
+        default:
+            return name();
+        }
+    }
+
+    unsigned seed_;
+
+    const char* identifiers_[4]{"alpha", "beta", "gamma", "delta"};
+};
+
+} // namespace
+
+TEST(Parser_test, Generated_expressions_round_trip_through_print_and_reparse)
+{
+    // The renderer prints every construct fully parenthesized, so its output is unambiguous source; parsing it
+    // back and printing again must reproduce the text exactly. This exercises operator and shape combinations no
+    // hand-written example covers, in the same spirit as munch's differential tests.
+    Expr_generator generator{12345};
+
+    for (int index{0}; index < 200; ++index)
+    {
+        const auto expression{generator.expression(4)};
+
+        const auto printed{to_string(expression)};
+
+        const auto reparsed{parse(printed)};
+
+        ASSERT_EQ(to_string(reparsed), printed) << "iteration " << index;
+    }
+}
