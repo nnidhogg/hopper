@@ -33,7 +33,7 @@ munch::core::Lexer build_lexer()
     builder.add_token(plus(any_of(Set::alpha())), Kind::Word, 1);
     builder.add_token(plus(any_of(Set::digits())), Kind::Number, 1);
     builder.add_token(plus(any_of(Set{' ', '\t'})), Kind::Whitespace, 1);
-    builder.add_token(text("\n"), Kind::Newline, 1);
+    builder.add_token(choice(text("\r\n"), text("\r"), text("\n")), Kind::Newline, 1);
 
     return builder.build();
 }
@@ -106,14 +106,21 @@ TEST(Token_reader_test, Load_replaces_the_input_and_reset_rewinds_it)
     EXPECT_EQ(reader.next().token().lexeme(), "second");
 }
 
-TEST(Token_reader_test, Windows_newlines_are_normalized)
+TEST(Token_reader_test, Windows_newlines_are_one_token_and_offsets_stay_original)
 {
-    // "\r\n" becomes "\n" before tokenization; unnormalized, the '\r' would surface as a lexical error.
+    // The input is tokenized exactly as given: "\r\n" is one Newline token, and offsets index the original
+    // bytes, so a diagnostic pointing at 'b' matches the file on disk byte for byte.
     Token_reader<Kind> reader{build_lexer(), std::string{"a\r\nb"}, skip_trivia};
 
     EXPECT_EQ(reader.next().token().kind(), Kind::Word);
-    EXPECT_EQ(reader.next().token().kind(), Kind::Newline);
+
+    EXPECT_EQ(reader.next().token().lexeme(), "\r\n");
+
     EXPECT_EQ(reader.next().token().kind(), Kind::Word);
+    EXPECT_EQ(reader.location().line(), 2U);
+    EXPECT_EQ(reader.location().column(), 1U);
+    EXPECT_EQ(reader.location().offset(), 3U);
+
     EXPECT_TRUE(reader.next().end_of_input());
 }
 
@@ -154,6 +161,6 @@ TEST(Token_reader_test, Location_starts_lines_after_a_newline)
     EXPECT_EQ(reader.location().line(), 2U);
     EXPECT_EQ(reader.location().column(), 1U);
 
-    // Offsets refer to the normalized input: the "\r\n" became one '\n', so "two" begins at offset 4.
-    EXPECT_EQ(reader.location().offset(), 4U);
+    // Offsets index the original bytes: "one\r\n" is five of them, so "two" begins at offset 5.
+    EXPECT_EQ(reader.location().offset(), 5U);
 }

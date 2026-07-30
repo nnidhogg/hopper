@@ -8,6 +8,7 @@
 #include <string_view>
 #include <utility>
 
+#include "hopper/parse/source_span.hpp"
 #include "hopper/parse/token_reader.hpp"
 
 namespace hopper::parse
@@ -123,6 +124,29 @@ protected:
         }
 
         return *token;
+    }
+
+    /**
+     * @brief The position where the next construct will begin: the next token's start, or where input ended.
+     *
+     * Capture this before parsing a construct and close the span with span_from() after it.
+     */
+    [[nodiscard]] Source_position mark()
+    {
+        if (peek_token())
+        {
+            return reader_.span().begin;
+        }
+
+        return reader_.previous_end();
+    }
+
+    /**
+     * @brief The span from a captured mark to the end of the most recently consumed token.
+     */
+    [[nodiscard]] Source_span span_from(const Source_position& begin) const noexcept
+    {
+        return {begin, reader_.previous_end()};
     }
 
     /**

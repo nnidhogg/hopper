@@ -17,7 +17,9 @@ namespace hopper::parse
  * @brief Turns a munch::core::Lexer into a one-token-lookahead stream of tokens.
  *
  * Token kinds accepted by the skip predicate (typically trivia such as whitespace) are discarded transparently;
- * callers only ever see meaningful tokens. Newlines in the input are normalized to '\n' before tokenization.
+ * callers only ever see meaningful tokens. The input is tokenized exactly as given: locations count "\r\n" and a
+ * lone '\r' as one newline each, and offsets always index the original bytes, so the token set must recognize
+ * carriage returns wherever its inputs may carry them.
  * @tparam Kind The token kind type (enum or integral) produced by the lexer.
  */
 template <typename Kind>
@@ -53,7 +55,7 @@ public:
      * @param skip Predicate selecting the token kinds to discard.
      */
     explicit Token_reader(munch::core::Lexer lexer, const std::string& input, const Skip_t skip = nullptr)
-        : tokenizer_{std::move(lexer), normalize(input)}, skip_{skip}
+        : tokenizer_{std::move(lexer), input}, skip_{skip}
     {}
 
     /**
@@ -63,7 +65,7 @@ public:
      * @param skip Predicate selecting the token kinds to discard.
      */
     explicit Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file, const Skip_t skip = nullptr)
-        : tokenizer_{std::move(lexer), normalize(file)}, skip_{skip}
+        : tokenizer_{std::move(lexer), read(file)}, skip_{skip}
     {}
 
     /**
@@ -71,7 +73,7 @@ public:
      */
     void load(const std::string& input)
     {
-        tokenizer_.load(normalize(input));
+        tokenizer_.load(input);
 
         lookahead_.reset();
     }
@@ -81,7 +83,7 @@ public:
      */
     void load(const std::filesystem::path& file)
     {
-        tokenizer_.load(normalize(file));
+        tokenizer_.load(read(file));
 
         lookahead_.reset();
     }
@@ -152,53 +154,21 @@ public:
     /**
      * @brief Access the location of the current token's first character.
      *
-     * Columns count bytes, not code points, and offsets refer to the normalized input, where every newline
-     * sequence is one '\n'; each "\r\n" in the original file shifts later offsets by one.
+     * Columns count bytes, not code points; offsets index the original input.
      */
     [[nodiscard]] const Token_location& location() const noexcept { return lookahead_.location(); }
 
+    /**
+     * @brief The span of the current token: its first byte to one past its last.
+     */
+    [[nodiscard]] Source_span span() const noexcept { return lookahead_.span(); }
+
+    /**
+     * @brief The end position of the most recently consumed token, where a finished construct actually stops.
+     */
+    [[nodiscard]] const Source_position& previous_end() const noexcept { return lookahead_.last_end(); }
+
 private:
-    /**
-     * @brief Normalize newline sequences in a string.
-     *
-     * Converts all platform-dependent newline encodings ("\r\n", "\r") to a single '\n' form.
-     * @param input Input string to normalize.
-     * @return Normalized string with unified newlines.
-     */
-    static std::string normalize(const std::string& input)
-    {
-        std::string output;
-
-        output.reserve(input.size());
-
-        for (auto iterator = input.cbegin(); iterator != input.cend();)
-        {
-            if (const char c = *iterator++; c == '\r')
-            {
-                if (iterator != input.cend() && *iterator == '\n')
-                {
-                    ++iterator;
-                }
-
-                output.push_back('\n');
-            }
-            else
-            {
-                output.push_back(c);
-            }
-        }
-
-        return output;
-    }
-
-    /**
-     * @brief Read and normalize a file.
-     * @param file Path to the file to read.
-     * @return Normalized file contents as a std::string.
-     * @throws std::runtime_error If the file cannot be opened.
-     */
-    static std::string normalize(const std::filesystem::path& file) { return normalize(read(file)); }
-
     /**
      * @brief Read the entire file contents into a string, in binary mode and without normalization.
      * @param file Path to the file to read.

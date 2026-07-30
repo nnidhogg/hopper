@@ -1,7 +1,5 @@
 #include "hopper/parse/token_location.hpp"
 
-#include <algorithm>
-
 namespace hopper::parse
 {
 Token_location::Token_location() : line_{1}, column_{1}, offset_{0}
@@ -29,9 +27,30 @@ void Token_location::reset() noexcept
 
 void Token_location::advance(const std::string_view lexeme) noexcept
 {
-    std::ranges::for_each(lexeme, [this](const char c) { column_ = c == '\n' ? (++line_, 1) : column_ + 1; });
+    // "\r\n" counts as one newline, and a lone '\r' counts as one too, so line and column stay right on any
+    // platform's line endings while offsets keep indexing the original bytes.
+    for (std::size_t index{0}; index < lexeme.size(); ++index)
+    {
+        const auto c{lexeme[index]};
+
+        if (c == '\n' || (c == '\r' && (index + 1 == lexeme.size() || lexeme[index + 1] != '\n')))
+        {
+            ++line_;
+
+            column_ = 1;
+        }
+        else if (c != '\r')
+        {
+            ++column_;
+        }
+    }
 
     offset_ += lexeme.size();
+}
+
+Source_position Token_location::position() const noexcept
+{
+    return {.offset = offset_, .line = line_, .column = column_};
 }
 
 } // namespace hopper::parse

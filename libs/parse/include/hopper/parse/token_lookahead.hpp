@@ -42,11 +42,32 @@ public:
     [[nodiscard]] const Token_location& location() const noexcept { return begin_; }
 
     /**
+     * @brief The span of the current token: its first byte to one past its last.
+     */
+    [[nodiscard]] Source_span span() const noexcept { return {begin_.position(), cursor_.position()}; }
+
+    /**
+     * @brief The end position of the most recently consumed token.
+     *
+     * This is where a grammar construct that just finished actually stops, unaffected by any token already
+     * buffered ahead of it.
+     */
+    [[nodiscard]] const Source_position& last_end() const noexcept { return last_end_; }
+
+    /**
      * @brief Consume and clear the buffered token.
      *
      * Returns the currently stored token (if any) and resets the internal optional to an empty state.
      */
-    std::optional<Token_t> consume() noexcept { return std::exchange(token_, std::nullopt); }
+    std::optional<Token_t> consume() noexcept
+    {
+        if (token_)
+        {
+            last_end_ = cursor_.position();
+        }
+
+        return std::exchange(token_, std::nullopt);
+    }
 
     /**
      * @brief Reset the reading position to the beginning of the current input and clear the token.
@@ -58,6 +79,8 @@ public:
         begin_.reset();
 
         cursor_.reset();
+
+        last_end_ = {};
     }
 
     /**
@@ -83,6 +106,8 @@ private:
     Token_location begin_;
 
     Token_location cursor_;
+
+    Source_position last_end_{};
 };
 
 } // namespace hopper::parse

@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <string_view>
 
+#include "hopper/parse/source_span.hpp"
+
 namespace hopper::parse
 {
 /**
@@ -34,6 +36,11 @@ public:
      * @brief Current byte offset (0-based from the start of input).
      */
     [[nodiscard]] std::size_t offset() const noexcept;
+
+    /**
+     * @brief The current position as a value, for storing in spans.
+     */
+    [[nodiscard]] Source_position position() const noexcept;
 
     /**
      * @brief Reset the reading position to the beginning of the current input.

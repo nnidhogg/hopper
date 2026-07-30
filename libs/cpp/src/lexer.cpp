@@ -61,7 +61,7 @@ munch::core::Lexer build_lexer()
 
     // Comments are trivia: recognized as tokens here, discarded by the parser's skip predicate. The block comment
     // is the classic automaton where a star run only closes the comment when '/' follows it.
-    builder.add_token(concat(text("//"), kleene(any_of(Set::all() - '\n'))), Token_kind::Line_comment, 1);
+    builder.add_token(concat(text("//"), kleene(any_of(Set::all() - '\n' - '\r'))), Token_kind::Line_comment, 1);
 
     builder.add_token(
             concat(text("/*"),
@@ -118,7 +118,8 @@ munch::core::Lexer build_lexer()
     builder.add_token(text(">>="), Token_kind::Greater_greater_equal, 1);
 
     builder.add_token(plus(any_of(Set{' ', '\t'})), Token_kind::Whitespace, 0);
-    builder.add_token(plus(any_of(Set::newline())), Token_kind::Newline, 0);
+    // The reader no longer normalizes line endings, so all three conventions are one newline token each.
+    builder.add_token(choice(text("\r\n"), text("\r"), text("\n")), Token_kind::Newline, 0);
 
     return builder.build();
 }
