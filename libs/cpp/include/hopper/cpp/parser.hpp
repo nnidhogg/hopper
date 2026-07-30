@@ -136,7 +136,7 @@ private:
      * @brief Parse one translation unit item, forking between function and declaration after the first
      * declarator's name: a '(' begins a parameter list, anything else continues a variable declaration.
      */
-    [[nodiscard]] ast::Translation_unit::Item_t parse_external_declaration();
+    [[nodiscard]] ast::Translation_unit::Item::Node_t parse_external_declaration();
 
     /**
      * @brief Parse a function's parameter list and body (or prototype ';'), the return declarator already parsed.

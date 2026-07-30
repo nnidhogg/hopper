@@ -345,7 +345,7 @@ std::string to_string(const ast::Translation_unit& unit)
 
     for (const auto& item : unit.items)
     {
-        items += std::visit([](const auto& node) { return to_string(node); }, item);
+        items += std::visit([](const auto& node) { return to_string(node); }, item.node);
     }
 
     return items;
@@ -1157,8 +1157,8 @@ TEST(Parser_test, Parses_a_realistic_source_file_end_to_end)
     // Five global declarations, one prototype, and four function definitions.
     ASSERT_EQ(unit.items.size(), 10U);
 
-    EXPECT_TRUE(std::holds_alternative<ast::Function>(unit.items.back()));
-    EXPECT_EQ(std::get<ast::Function>(unit.items.back()).name, "main");
+    EXPECT_TRUE(std::holds_alternative<ast::Function>(unit.items.back().node));
+    EXPECT_EQ(std::get<ast::Function>(unit.items.back().node).name, "main");
 }
 
 TEST(Parser_test, Throws_on_out_of_range_numeric_literals)
@@ -1169,4 +1169,65 @@ TEST(Parser_test, Throws_on_out_of_range_numeric_literals)
 
     // The largest representable values still convert.
     EXPECT_EQ(to_string(parse("9223372036854775807")), "9223372036854775807");
+}
+
+TEST(Parser_test, Expression_spans_cover_their_source_extent)
+{
+    const auto expr{parse("1 + 23")};
+
+    EXPECT_EQ(expr.span.begin.offset, 0U);
+    EXPECT_EQ(expr.span.end.offset, 6U);
+
+    const auto& binary{std::get<ast::Binary>(expr.node)};
+
+    EXPECT_EQ(binary.lhs->span.begin.offset, 0U);
+    EXPECT_EQ(binary.lhs->span.end.offset, 1U);
+    EXPECT_EQ(binary.rhs->span.begin.offset, 4U);
+    EXPECT_EQ(binary.rhs->span.end.offset, 6U);
+}
+
+TEST(Parser_test, Parenthesized_spans_include_the_parentheses)
+{
+    const auto expr{parse("(a)")};
+
+    EXPECT_EQ(expr.span.begin.offset, 0U);
+    EXPECT_EQ(expr.span.end.offset, 3U);
+}
+
+TEST(Parser_test, Statement_spans_skip_leading_trivia)
+{
+    const auto stmt{parse_stmt("  x = 1;")};
+
+    EXPECT_EQ(stmt.span.begin.offset, 2U);
+    EXPECT_EQ(stmt.span.begin.column, 3U);
+    EXPECT_EQ(stmt.span.end.offset, 8U);
+}
+
+TEST(Parser_test, Item_spans_follow_source_order_across_lines)
+{
+    const auto unit{parse_unit("int a = 1;\r\nint b = 2;")};
+
+    ASSERT_EQ(unit.items.size(), 2U);
+
+    EXPECT_EQ(unit.items.front().span.begin.offset, 0U);
+    EXPECT_EQ(unit.items.front().span.end.offset, 10U);
+
+    // Offsets index the original bytes, so the second item starts after the two-byte "\r\n".
+    EXPECT_EQ(unit.items.back().span.begin.offset, 12U);
+    EXPECT_EQ(unit.items.back().span.begin.line, 2U);
+    EXPECT_EQ(unit.items.back().span.begin.column, 1U);
+    EXPECT_EQ(unit.items.back().span.end.offset, 22U);
+}
+
+TEST(Parser_test, Block_spans_cover_their_braces)
+{
+    const auto stmt{parse_stmt("{ x; y; }")};
+
+    EXPECT_EQ(stmt.span.begin.offset, 0U);
+    EXPECT_EQ(stmt.span.end.offset, 9U);
+
+    const auto& compound{std::get<ast::Compound>(stmt.node)};
+
+    EXPECT_EQ(compound.statements.front().span.begin.offset, 2U);
+    EXPECT_EQ(compound.statements.back().span.end.offset, 7U);
 }

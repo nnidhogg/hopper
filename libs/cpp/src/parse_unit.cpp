@@ -14,13 +14,17 @@ ast::Translation_unit Parser::parse_translation_unit()
 
     while (peek_token())
     {
-        unit.items.push_back(parse_external_declaration());
+        const auto begin{mark()};
+
+        auto node{parse_external_declaration()};
+
+        unit.items.push_back({.node = std::move(node), .span = span_from(begin)});
     }
 
     return unit;
 }
 
-ast::Translation_unit::Item_t Parser::parse_external_declaration()
+ast::Translation_unit::Item::Node_t Parser::parse_external_declaration()
 {
     auto type{parse_type_specifier()};
 

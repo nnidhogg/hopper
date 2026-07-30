@@ -6,6 +6,8 @@
 #include <variant>
 #include <vector>
 
+#include "hopper/parse/source_span.hpp"
+
 namespace hopper::cpp::ast
 {
 struct Expr;
@@ -238,6 +240,11 @@ struct Expr
      * @brief The node this expression holds.
      */
     Node_t node;
+
+    /**
+     * @brief The source range this expression was parsed from, including any enclosing parentheses.
+     */
+    parse::Source_span span{};
 };
 
 } // namespace hopper::cpp::ast

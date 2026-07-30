@@ -72,6 +72,8 @@ std::optional<ast::Assign_op> assign_operator_for(const Token_kind kind)
 
 ast::Expr Parser::parse_assignment()
 {
+    const auto begin{mark()};
+
     auto expr{parse_ternary()};
 
     const auto token{peek_token()};
@@ -86,11 +88,17 @@ ast::Expr Parser::parse_assignment()
 
     // Right-associative: the right-hand side is itself a full assignment-expression, so `a = b = c` parses as
     // `a = (b = c)`. `expr` (the target) is not checked for being an lvalue here; see ast::Assign.
-    return make_assign(*op, std::move(expr), parse_assignment());
+    auto assign{make_assign(*op, std::move(expr), parse_assignment())};
+
+    assign.span = span_from(begin);
+
+    return assign;
 }
 
 ast::Expr Parser::parse_ternary()
 {
+    const auto begin{mark()};
+
     // 1 is Logical_or's precedence in binary_operator_for(), the loosest-binding binary operator.
     auto condition{parse_binary(1)};
 
@@ -107,15 +115,19 @@ ast::Expr Parser::parse_ternary()
 
     auto else_branch{parse_assignment()};
 
-    return {.node = ast::Ternary{
-                    .condition = std::make_unique<ast::Expr>(std::move(condition)),
-                    .then_branch = std::make_unique<ast::Expr>(std::move(then_branch)),
-                    .else_branch = std::make_unique<ast::Expr>(std::move(else_branch)),
-            }};
+    return {.node =
+                    ast::Ternary{
+                            .condition = std::make_unique<ast::Expr>(std::move(condition)),
+                            .then_branch = std::make_unique<ast::Expr>(std::move(then_branch)),
+                            .else_branch = std::make_unique<ast::Expr>(std::move(else_branch)),
+                    },
+            .span = span_from(begin)};
 }
 
 ast::Expr Parser::parse_binary(const int min_precedence)
 {
+    const auto begin{mark()};
+
     auto expr{parse_unary()};
 
     for (;;)
@@ -133,51 +145,63 @@ ast::Expr Parser::parse_binary(const int min_precedence)
         // info->precedence + 1 stops the recursive call from also consuming an operator of the same precedence,
         // which is what makes every level in this ladder left-associative.
         expr = make_binary(info->op, std::move(expr), parse_binary(info->precedence + 1));
+
+        expr.span = span_from(begin);
     }
 }
 
 ast::Expr Parser::parse_unary()
 {
+    const auto begin{mark()};
+
+    const auto prefixed{[this, &begin](const ast::Unary_op op) {
+        auto expr{make_unary(op, parse_unary())};
+
+        expr.span = span_from(begin);
+
+        return expr;
+    }};
+
     if (accept(Token_kind::Plus))
     {
-        return make_unary(ast::Unary_op::Plus, parse_unary());
+        return prefixed(ast::Unary_op::Plus);
     }
 
     if (accept(Token_kind::Minus))
     {
-        return make_unary(ast::Unary_op::Minus, parse_unary());
+        return prefixed(ast::Unary_op::Minus);
     }
 
     if (accept(Token_kind::Bang))
     {
-        return make_unary(ast::Unary_op::Not, parse_unary());
+        return prefixed(ast::Unary_op::Not);
     }
 
     if (accept(Token_kind::Tilde))
     {
-        return make_unary(ast::Unary_op::Bitwise_not, parse_unary());
+        return prefixed(ast::Unary_op::Bitwise_not);
     }
 
     if (accept(Token_kind::Plus_plus))
     {
-        return make_unary(ast::Unary_op::Pre_increment, parse_unary());
+        return prefixed(ast::Unary_op::Pre_increment);
     }
 
     if (accept(Token_kind::Minus_minus))
     {
-        return make_unary(ast::Unary_op::Pre_decrement, parse_unary());
+        return prefixed(ast::Unary_op::Pre_decrement);
     }
 
     // '&' and '*' are prefix operators here and binary operators after a left operand; the position decides,
     // exactly as in C++.
     if (accept(Token_kind::Amp))
     {
-        return make_unary(ast::Unary_op::Address_of, parse_unary());
+        return prefixed(ast::Unary_op::Address_of);
     }
 
     if (accept(Token_kind::Star))
     {
-        return make_unary(ast::Unary_op::Dereference, parse_unary());
+        return prefixed(ast::Unary_op::Dereference);
     }
 
     return parse_postfix();
@@ -185,6 +209,8 @@ ast::Expr Parser::parse_unary()
 
 ast::Expr Parser::parse_postfix()
 {
+    const auto begin{mark()};
+
     auto expr{parse_primary()};
 
     for (;;)
@@ -209,6 +235,8 @@ ast::Expr Parser::parse_postfix()
                             .callee = std::make_unique<ast::Expr>(std::move(expr)),
                             .arguments = std::move(arguments),
                     }};
+
+            expr.span = span_from(begin);
         }
         else if (accept(Token_kind::Left_bracket))
         {
@@ -220,6 +248,8 @@ ast::Expr Parser::parse_postfix()
                             .object = std::make_unique<ast::Expr>(std::move(expr)),
                             .index = std::make_unique<ast::Expr>(std::move(index)),
                     }};
+
+            expr.span = span_from(begin);
         }
         else if (accept(Token_kind::Dot))
         {
@@ -230,6 +260,8 @@ ast::Expr Parser::parse_postfix()
                             .object = std::make_unique<ast::Expr>(std::move(expr)),
                             .member = std::string{member.lexeme()},
                     }};
+
+            expr.span = span_from(begin);
         }
         else if (accept(Token_kind::Arrow))
         {
@@ -240,18 +272,24 @@ ast::Expr Parser::parse_postfix()
                             .object = std::make_unique<ast::Expr>(std::move(expr)),
                             .member = std::string{member.lexeme()},
                     }};
+
+            expr.span = span_from(begin);
         }
         else if (accept(Token_kind::Plus_plus))
         {
             expr = {.node = ast::Postfix{
                             .op = ast::Postfix_op::Increment,
                             .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+
+            expr.span = span_from(begin);
         }
         else if (accept(Token_kind::Minus_minus))
         {
             expr = {.node = ast::Postfix{
                             .op = ast::Postfix_op::Decrement,
                             .operand = std::make_unique<ast::Expr>(std::move(expr))}};
+
+            expr.span = span_from(begin);
         }
         else
         {
@@ -262,6 +300,8 @@ ast::Expr Parser::parse_postfix()
 
 ast::Expr Parser::parse_primary()
 {
+    const auto begin{mark()};
+
     if (const auto token{accept(Token_kind::Integer_literal)}; token)
     {
         auto lexeme{token->lexeme()};
@@ -291,7 +331,7 @@ ast::Expr Parser::parse_primary()
             syntax_error("Integer literal is out of range", *token);
         }
 
-        return {.node = ast::Int_literal{.value = value}};
+        return {.node = ast::Int_literal{.value = value}, .span = span_from(begin)};
     }
 
     if (const auto token{accept(Token_kind::Floating_point_literal)}; token)
@@ -307,36 +347,38 @@ ast::Expr Parser::parse_primary()
             syntax_error("Floating point literal is out of range", *token);
         }
 
-        return {.node = ast::Float_literal{.value = value}};
+        return {.node = ast::Float_literal{.value = value}, .span = span_from(begin)};
     }
 
     if (const auto token{accept(Token_kind::String_literal)}; token)
     {
         const auto lexeme{token->lexeme()};
 
-        return {.node = ast::String_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}}};
+        return {.node = ast::String_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}},
+                .span = span_from(begin)};
     }
 
     if (const auto token{accept(Token_kind::Character_literal)}; token)
     {
         const auto lexeme{token->lexeme()};
 
-        return {.node = ast::Char_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}}};
+        return {.node = ast::Char_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}},
+                .span = span_from(begin)};
     }
 
     if (accept(Token_kind::Keyword_true))
     {
-        return {.node = ast::Bool_literal{.value = true}};
+        return {.node = ast::Bool_literal{.value = true}, .span = span_from(begin)};
     }
 
     if (accept(Token_kind::Keyword_false))
     {
-        return {.node = ast::Bool_literal{.value = false}};
+        return {.node = ast::Bool_literal{.value = false}, .span = span_from(begin)};
     }
 
     if (const auto token{accept(Token_kind::Identifier)}; token)
     {
-        return {.node = ast::Name{.identifier = std::string{token->lexeme()}}};
+        return {.node = ast::Name{.identifier = std::string{token->lexeme()}}, .span = span_from(begin)};
     }
 
     if (accept(Token_kind::Left_paren))
@@ -346,6 +388,10 @@ ast::Expr Parser::parse_primary()
         auto expr{parse_assignment()};
 
         expect(Token_kind::Right_paren, "')' to close '('");
+
+        // The span covers the parentheses: this node's source extent is what the author wrote, even though the
+        // parentheses themselves leave no node behind.
+        expr.span = span_from(begin);
 
         return expr;
     }

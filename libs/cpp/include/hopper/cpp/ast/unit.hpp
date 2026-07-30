@@ -10,6 +10,7 @@
 
 #include "hopper/cpp/ast/decl.hpp"
 #include "hopper/cpp/ast/stmt.hpp"
+#include "hopper/parse/source_span.hpp"
 
 namespace hopper::cpp::ast
 {
@@ -50,14 +51,30 @@ struct Function
 struct Translation_unit
 {
     /**
-     * @brief The kinds of item a translation unit can hold.
+     * @brief One item with the source range it was parsed from.
      */
-    using Item_t = std::variant<Declaration, Function>;
+    struct Item
+    {
+        /**
+         * @brief The kinds of node an item can be.
+         */
+        using Node_t = std::variant<Declaration, Function>;
+
+        /**
+         * @brief The node this item holds.
+         */
+        Node_t node;
+
+        /**
+         * @brief The source range this item was parsed from.
+         */
+        parse::Source_span span{};
+    };
 
     /**
      * @brief The items in source order.
      */
-    std::vector<Item_t> items;
+    std::vector<Item> items;
 };
 
 } // namespace hopper::cpp::ast

@@ -44,6 +44,8 @@ bool Parser::is_declaration_start()
 
 ast::Stmt Parser::parse_declaration_statement()
 {
+    const auto begin{mark()};
+
     auto type{parse_type_specifier()};
 
     std::vector<ast::Declarator> declarators;
@@ -57,7 +59,7 @@ ast::Stmt Parser::parse_declaration_statement()
 
     expect(Token_kind::Semicolon, "';' after the declaration");
 
-    return {.node = ast::Declaration{.type = type, .declarators = std::move(declarators)}};
+    return {.node = ast::Declaration{.type = type, .declarators = std::move(declarators)}, .span = span_from(begin)};
 }
 
 ast::Type Parser::parse_type_specifier()

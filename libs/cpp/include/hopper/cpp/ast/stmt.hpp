@@ -104,6 +104,11 @@ struct Stmt
      * @brief The node this statement holds.
      */
     Node_t node;
+
+    /**
+     * @brief The source range this statement was parsed from.
+     */
+    parse::Source_span span{};
 };
 
 } // namespace hopper::cpp::ast
