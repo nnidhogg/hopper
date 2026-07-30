@@ -128,3 +128,32 @@ TEST(Token_reader_test, Location_tracks_lines_and_columns)
     EXPECT_EQ(reader.next().token().lexeme(), "two");
     EXPECT_EQ(reader.location().line(), 2U);
 }
+
+TEST(Token_reader_test, Location_reports_the_current_tokens_start)
+{
+    Token_reader<Kind> reader{build_lexer(), std::string{"one two"}, skip_trivia};
+
+    EXPECT_EQ(reader.next().token().lexeme(), "one");
+    EXPECT_EQ(reader.location().line(), 1U);
+    EXPECT_EQ(reader.location().column(), 1U);
+    EXPECT_EQ(reader.location().offset(), 0U);
+
+    EXPECT_EQ(reader.next().token().lexeme(), "two");
+    EXPECT_EQ(reader.location().column(), 5U);
+    EXPECT_EQ(reader.location().offset(), 4U);
+}
+
+TEST(Token_reader_test, Location_starts_lines_after_a_newline)
+{
+    Token_reader<Kind> reader{build_lexer(), std::string{"one\r\ntwo"}, skip_trivia};
+
+    EXPECT_EQ(reader.next().token().lexeme(), "one");
+    EXPECT_EQ(reader.next().token().kind(), Kind::Newline);
+
+    EXPECT_EQ(reader.next().token().lexeme(), "two");
+    EXPECT_EQ(reader.location().line(), 2U);
+    EXPECT_EQ(reader.location().column(), 1U);
+
+    // Offsets refer to the normalized input: the "\r\n" became one '\n', so "two" begins at offset 4.
+    EXPECT_EQ(reader.location().offset(), 4U);
+}

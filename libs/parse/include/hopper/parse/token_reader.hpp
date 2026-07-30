@@ -150,7 +150,10 @@ public:
     }
 
     /**
-     * @brief Access the location associated with the current token.
+     * @brief Access the location of the current token's first character.
+     *
+     * Columns count bytes, not code points, and offsets refer to the normalized input, where every newline
+     * sequence is one '\n'; each "\r\n" in the original file shifts later offsets by one.
      */
     [[nodiscard]] const Token_location& location() const noexcept { return lookahead_.location(); }
 

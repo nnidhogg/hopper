@@ -37,9 +37,9 @@ public:
     [[nodiscard]] const std::optional<Token_t>& token() const noexcept { return token_; }
 
     /**
-     * @brief Access the location associated with the current token.
+     * @brief Access the location of the current token's first character.
      */
-    [[nodiscard]] const Token_location& location() const noexcept { return location_; }
+    [[nodiscard]] const Token_location& location() const noexcept { return begin_; }
 
     /**
      * @brief Consume and clear the buffered token.
@@ -55,7 +55,9 @@ public:
     {
         token_.reset();
 
-        location_.reset();
+        begin_.reset();
+
+        cursor_.reset();
     }
 
     /**
@@ -68,13 +70,19 @@ public:
     {
         token_.emplace(kind, lexeme);
 
-        location_.advance(lexeme);
+        // The exposed location is where this token begins; the cursor runs ahead over the lexeme so the next
+        // token's beginning is already known.
+        begin_ = cursor_;
+
+        cursor_.advance(lexeme);
     }
 
 private:
     std::optional<Token_t> token_;
 
-    Token_location location_;
+    Token_location begin_;
+
+    Token_location cursor_;
 };
 
 } // namespace hopper::parse
