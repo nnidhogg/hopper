@@ -1,6 +1,7 @@
 #ifndef HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
 #define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
 
+#include <filesystem>
 #include <munch/tools/tokenizer/token.hpp>
 #include <optional>
 #include <string>
@@ -125,6 +126,23 @@ protected:
 
         return *token;
     }
+
+    /**
+     * @brief Replace the input and rewind, so one parser and its compiled lexer serve many inputs in sequence.
+     *
+     * Previously returned ASTs stay valid: they own their strings rather than viewing the reader's buffer.
+     */
+    void load(const std::string& input) { reader_.load(input); }
+
+    /**
+     * @brief Replace the input with a file's contents and rewind.
+     */
+    void load(const std::filesystem::path& file) { reader_.load(file); }
+
+    /**
+     * @brief Rewind to the beginning of the current input.
+     */
+    void reset() noexcept { reader_.reset(); }
 
     /**
      * @brief The position where the next construct will begin: the next token's start, or where input ended.

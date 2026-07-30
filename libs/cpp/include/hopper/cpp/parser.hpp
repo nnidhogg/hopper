@@ -57,6 +57,16 @@ public:
     explicit Parser(munch::core::Lexer lexer, const std::filesystem::path& file);
 
     /**
+     * @brief Replace the input (a string or a file path) and rewind, reusing this parser and its compiled lexer.
+     *
+     * Building the lexer dominates a Parser's construction cost, so a driver processing many files should load
+     * them into one parser rather than construct a parser per file. ASTs already returned stay valid.
+     */
+    using parse::Parser_base<Token_kind>::load;
+
+    using parse::Parser_base<Token_kind>::reset;
+
+    /**
      * @brief Parse a single expression, consuming the whole input.
      * @throws std::runtime_error If a lexical or syntax error occurs, or trailing input remains.
      */
