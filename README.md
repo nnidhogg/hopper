@@ -1,13 +1,13 @@
 # **Hopper**
 
-<div style="text-align: center; margin-bottom: 1rem;">
+<p align="center">
   <img src="https://img.shields.io/badge/C%2B%2B-23-blue.svg" alt="C++23">
   <img src="https://github.com/nnidhogg/hopper/actions/workflows/ci.yml/badge.svg" alt="CI">
   <img src="https://github.com/nnidhogg/hopper/actions/workflows/codeql.yml/badge.svg" alt="CodeQL">
   <img src="https://codecov.io/gh/nnidhogg/hopper/branch/master/graph/badge.svg" alt="Coverage">
   <img src="https://img.shields.io/github/license/nnidhogg/hopper" alt="License">
   <img src="https://img.shields.io/github/v/release/nnidhogg/hopper?include_prereleases&sort=semver" alt="Release">
-</div>
+</p>
 
 `hopper` is a **lightweight C++23 library** for building **recursive-descent parsers**. It works seamlessly with the
 **[`munch`](https://github.com/nnidhogg/munch)** project and provides a **token stream with lookahead**, **source
