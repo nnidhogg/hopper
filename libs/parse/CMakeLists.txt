@@ -3,6 +3,7 @@ cmake_policy(SET CMP0097 NEW)
 project(hopper_parse)
 
 add_library(${PROJECT_NAME}
+        src/parse_error.cpp
         src/token_location.cpp
 )
 

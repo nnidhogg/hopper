@@ -3,11 +3,11 @@
 
 #include <munch/tools/tokenizer/token.hpp>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 
+#include "hopper/parse/parse_error.hpp"
 #include "hopper/parse/source_span.hpp"
 #include "hopper/parse/token_reader.hpp"
 
@@ -48,7 +48,7 @@ protected:
 
         if (result.has_error())
         {
-            throw std::runtime_error{"Lexical error: " + result.error().message()};
+            lexical_error(result.error().message());
         }
 
         if (result.has_token())
@@ -69,7 +69,7 @@ protected:
 
         if (result.has_error())
         {
-            throw std::runtime_error{"Lexical error: " + result.error().message()};
+            lexical_error(result.error().message());
         }
 
         if (result.has_token())
@@ -150,20 +150,36 @@ protected:
     }
 
     /**
-     * @brief Throw a syntax error naming the offending token.
+     * @brief Throw a syntax error naming and pointing at the offending token.
+     *
+     * The reader's current span covers the offending token whether it was just consumed or is still buffered, so
+     * the error points at the right source range either way.
      */
     [[noreturn]] void syntax_error(const std::string_view message, const Token_t& where)
     {
-        throw std::runtime_error{
+        throw Parse_error{
+                Parse_error_kind::Unexpected_token, reader_.span(),
                 "Syntax error: " + std::string(message) + ", got '" + std::string(where.lexeme()) + "'"};
     }
 
     /**
-     * @brief Throw a syntax error for input that ended too early.
+     * @brief Throw a syntax error for input that ended too early, pointing one past the last consumed token.
      */
     [[noreturn]] void eof_error(const std::string_view message)
     {
-        throw std::runtime_error{"Syntax error: " + std::string(message)};
+        const auto& at{reader_.previous_end()};
+
+        throw Parse_error{Parse_error_kind::Unexpected_end, {at, at}, "Syntax error: " + std::string(message)};
+    }
+
+    /**
+     * @brief Throw for input the lexer rejected, pointing at where tokenization stopped.
+     */
+    [[noreturn]] void lexical_error(const std::string& message)
+    {
+        const auto at{reader_.span().end};
+
+        throw Parse_error{Parse_error_kind::Lexical, {at, at}, "Lexical error: " + message};
     }
 
 private:

@@ -116,3 +116,61 @@ TEST(Parser_base_test, Lexical_errors_become_exceptions)
 
     EXPECT_THROW(static_cast<void>(parser.next_token()), std::runtime_error);
 }
+
+TEST(Parser_base_test, Errors_carry_their_kind_and_span)
+{
+    Test_parser parser{"word 1"};
+
+    try
+    {
+        static_cast<void>(parser.expect(Kind::Number, "a number"));
+
+        FAIL() << "expect() should have thrown";
+    }
+    catch (const Parse_error& error)
+    {
+        EXPECT_EQ(error.kind(), Parse_error_kind::Unexpected_token);
+        EXPECT_EQ(error.span().begin.offset, 0U);
+        EXPECT_EQ(error.span().end.offset, 4U);
+        EXPECT_NE(std::string{error.what()}.find("1:1:"), std::string::npos);
+    }
+}
+
+TEST(Parser_base_test, End_of_input_errors_point_past_the_last_token)
+{
+    Test_parser parser{"word"};
+
+    static_cast<void>(parser.next_token());
+
+    try
+    {
+        static_cast<void>(parser.expect(Kind::Word, "another word"));
+
+        FAIL() << "expect() should have thrown";
+    }
+    catch (const Parse_error& error)
+    {
+        EXPECT_EQ(error.kind(), Parse_error_kind::Unexpected_end);
+        EXPECT_EQ(error.span().begin.offset, 4U);
+        EXPECT_EQ(error.span().begin, error.span().end);
+    }
+}
+
+TEST(Parser_base_test, Lexical_errors_point_at_the_rejected_input)
+{
+    Test_parser parser{"ok @"};
+
+    static_cast<void>(parser.next_token());
+
+    try
+    {
+        static_cast<void>(parser.next_token());
+
+        FAIL() << "next_token() should have thrown";
+    }
+    catch (const Parse_error& error)
+    {
+        EXPECT_EQ(error.kind(), Parse_error_kind::Lexical);
+        EXPECT_EQ(error.span().begin.offset, 3U);
+    }
+}
