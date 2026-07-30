@@ -226,6 +226,20 @@ std::string type_name(const ast::Type& type)
     return (type.is_const ? "const " : "") + name;
 }
 
+std::string to_string(const ast::Declaration& declaration)
+{
+    std::string declarators;
+
+    for (const auto& declarator : declaration.declarators)
+    {
+        declarators += (declarators.empty() ? "" : ",") + std::string(declarator.pointers, '*') +
+                       (declarator.reference ? "&" : "") + declarator.name +
+                       (declarator.initializer ? "=" + to_string(*declarator.initializer) : "");
+    }
+
+    return type_name(declaration.type) + " " + declarators + ";";
+}
+
 // Renders the AST back as compact source, bracing the branches of if and while so the two possible bindings of a
 // dangling else render differently.
 std::string to_string(const ast::Stmt& stmt)
@@ -280,19 +294,44 @@ std::string to_string(const ast::Stmt& stmt)
                 {
                     static_assert(std::is_same_v<Node_t, ast::Declaration>);
 
-                    std::string declarators;
-
-                    for (const auto& declarator : node.declarators)
-                    {
-                        declarators += (declarators.empty() ? "" : ",") + std::string(declarator.pointers, '*') +
-                                       (declarator.reference ? "&" : "") + declarator.name +
-                                       (declarator.initializer ? "=" + to_string(*declarator.initializer) : "");
-                    }
-
-                    return type_name(node.type) + " " + declarators + ";";
+                    return to_string(node);
                 }
             },
             stmt.node);
+}
+
+std::string to_string(const ast::Parameter& parameter)
+{
+    const auto declarator{std::string(parameter.pointers, '*') + (parameter.reference ? "&" : "") + parameter.name +
+                          (parameter.default_value ? "=" + to_string(*parameter.default_value) : "")};
+
+    return declarator.empty() ? type_name(parameter.type) : type_name(parameter.type) + " " + declarator;
+}
+
+std::string to_string(const ast::Function& function)
+{
+    std::string parameters;
+
+    for (const auto& parameter : function.parameters)
+    {
+        parameters += (parameters.empty() ? "" : ",") + to_string(parameter);
+    }
+
+    return type_name(function.return_type) + " " + std::string(function.pointers, '*') +
+           (function.reference ? "&" : "") + function.name + "(" + parameters + ")" +
+           (function.body ? to_string(*function.body) : ";");
+}
+
+std::string to_string(const ast::Translation_unit& unit)
+{
+    std::string items;
+
+    for (const auto& item : unit.items)
+    {
+        items += std::visit([](const auto& node) { return to_string(node); }, item);
+    }
+
+    return items;
 }
 
 ast::Expr parse(const std::string& input)
@@ -307,6 +346,13 @@ ast::Stmt parse_stmt(const std::string& input)
     Parser parser{build_lexer(), input};
 
     return parser.parse_statement();
+}
+
+ast::Translation_unit parse_unit(const std::string& input)
+{
+    Parser parser{build_lexer(), input};
+
+    return parser.parse_translation_unit();
 }
 
 } // namespace
@@ -927,4 +973,62 @@ TEST(Parser_test, Throws_on_malformed_do_while)
     EXPECT_THROW(parse_stmt("do f();"), std::runtime_error);
     EXPECT_THROW(parse_stmt("do f(); while (x)"), std::runtime_error);
     EXPECT_THROW(parse_stmt("do while (x);"), std::runtime_error);
+}
+
+TEST(Parser_test, Function_definition)
+{
+    EXPECT_EQ(to_string(parse_unit("int main() { return 0; }")), "int main(){return 0;}");
+}
+
+TEST(Parser_test, Function_with_parameters)
+{
+    EXPECT_EQ(to_string(parse_unit("int add(int a, int b) { return a + b; }")), "int add(int a,int b){return (a+b);}");
+}
+
+TEST(Parser_test, Function_prototype_with_pointer_shapes)
+{
+    EXPECT_EQ(to_string(parse_unit("const char* find(const char* haystack, char needle);")),
+              "const char *find(const char *haystack,char needle);");
+}
+
+TEST(Parser_test, Function_parameters_may_be_unnamed_or_defaulted)
+{
+    EXPECT_EQ(to_string(parse_unit("void log(int, double level = 1.5);")), "void log(int,double level=1.500000);");
+}
+
+TEST(Parser_test, Function_returning_a_reference)
+{
+    EXPECT_EQ(to_string(parse_unit("int& at(int i) { return x; }")), "int &at(int i){return x;}");
+}
+
+TEST(Parser_test, Translation_unit_mixes_declarations_and_functions)
+{
+    EXPECT_EQ(to_string(parse_unit("int counter = 0; void tick(); int get() { return counter; }")),
+              "int counter=0;void tick();int get(){return counter;}");
+}
+
+TEST(Parser_test, Translation_unit_holds_several_definitions)
+{
+    EXPECT_EQ(to_string(parse_unit("void a() {} void b() { a(); }")), "void a(){}void b(){a();}");
+}
+
+TEST(Parser_test, Empty_translation_unit)
+{
+    EXPECT_TRUE(parse_unit("").items.empty());
+}
+
+TEST(Parser_test, Function_bodies_use_the_full_statement_grammar)
+{
+    EXPECT_EQ(to_string(parse_unit("int sum(int n) { int total = 0; for (int i = 0; i < n; i++) total += i; return total; }")),
+              "int sum(int n){int total=0;for(int i=0;(i<n);(i++)){(total+=i);}return total;}");
+}
+
+TEST(Parser_test, Throws_on_malformed_functions)
+{
+    EXPECT_THROW(parse_unit("int f("), std::runtime_error);
+    EXPECT_THROW(parse_unit("int f()"), std::runtime_error);
+    EXPECT_THROW(parse_unit("int f(x);"), std::runtime_error);
+    EXPECT_THROW(parse_unit("int f(int a { return a; }"), std::runtime_error);
+    EXPECT_THROW(parse_unit("int f() { return 0; } }"), std::runtime_error);
+    EXPECT_THROW(parse_unit(";"), std::runtime_error);
 }

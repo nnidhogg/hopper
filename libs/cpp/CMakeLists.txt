@@ -9,6 +9,7 @@ add_library(${PROJECT_NAME}
         src/parse_declaration.cpp
         src/parse_expression.cpp
         src/parse_statement.cpp
+        src/parse_unit.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
