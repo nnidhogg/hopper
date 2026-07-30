@@ -1160,3 +1160,13 @@ TEST(Parser_test, Parses_a_realistic_source_file_end_to_end)
     EXPECT_TRUE(std::holds_alternative<ast::Function>(unit.items.back()));
     EXPECT_EQ(std::get<ast::Function>(unit.items.back()).name, "main");
 }
+
+TEST(Parser_test, Throws_on_out_of_range_numeric_literals)
+{
+    EXPECT_THROW(parse("99999999999999999999999999999"), std::runtime_error);
+    EXPECT_THROW(parse("0x10000000000000000"), std::runtime_error);
+    EXPECT_THROW(parse(std::string(400, '9') + ".5"), std::runtime_error);
+
+    // The largest representable values still convert.
+    EXPECT_EQ(to_string(parse("9223372036854775807")), "9223372036854775807");
+}

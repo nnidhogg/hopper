@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -282,15 +283,29 @@ ast::Expr Parser::parse_primary()
         }
 
         long long value{};
-        std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value, base);
+
+        const auto [end, error]{std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value, base)};
+
+        if (error != std::errc{} || end != lexeme.data() + lexeme.size())
+        {
+            syntax_error("Integer literal is out of range", *token);
+        }
 
         return {.node = ast::Int_literal{.value = value}};
     }
 
     if (const auto token{accept(Token_kind::Floating_point_literal)}; token)
     {
+        const auto lexeme{token->lexeme()};
+
         double value{};
-        std::from_chars(token->lexeme().data(), token->lexeme().data() + token->lexeme().size(), value);
+
+        const auto [end, error]{std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value)};
+
+        if (error != std::errc{} || end != lexeme.data() + lexeme.size())
+        {
+            syntax_error("Floating point literal is out of range", *token);
+        }
 
         return {.node = ast::Float_literal{.value = value}};
     }
