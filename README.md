@@ -42,6 +42,50 @@ This serves as both a **reference implementation** and a **validation** of the l
 
 Breaking changes may occur while the API is being refined.
 
+## **Architecture Overview**
+
+| Module        | Responsibility                                                                                          |
+|---------------|----------------------------------------------------------------------------------------------------------|
+| `hopper::parse` | The generic toolkit: `Token_reader` (one-token lookahead over a munch lexer, trivia skipping, newline normalization, line/column tracking) and `Parser_base` (the LL(1) primitives: `peek`, `check`, `accept`, `expect`, structured errors). |
+| `hopper::cpp`   | The C++ front end built on the toolkit: a munch token set, plain-struct variant ASTs (`ast::Expr`, `ast::Stmt`, `ast::Translation_unit`), and a `Parser` with one implementation file per grammar area. |
+
+The split mirrors the library's purpose: everything a recursive-descent parser needs regardless of language lives in
+`libs/parse`, and everything specific to the C++ subset lives in `libs/cpp` as the reference consumer. A new language
+front end starts from `Token_reader` and `Parser_base` and brings only its token set, its AST, and its grammar
+functions.
+
+## **Usage**
+
+```cpp
+#include <hopper/cpp/lexer.hpp>
+#include <hopper/cpp/parser.hpp>
+
+using namespace hopper::cpp;
+
+Parser parser{build_lexer(), std::string{"int add(int a, int b) { return a + b; }"}};
+
+const auto unit{parser.parse_translation_unit()};
+
+// unit.items holds one ast::Function; walk the variant ASTs with std::visit.
+```
+
+`Parser` also accepts a `std::filesystem::path` to parse a file, and exposes `parse_expression()` and
+`parse_statement()` for smaller entry points. All three throw `std::runtime_error` with a position-bearing message on
+lexical or syntax errors.
+
+## **Building and Testing**
+
+```bash
+git clone --recurse-submodules https://github.com/nnidhogg/hopper.git
+cmake -S hopper -B hopper/build
+cmake --build hopper/build -j 8
+cd hopper/build && ctest --output-on-failure
+```
+
+munch is vendored as a submodule under `external/munch`; everything else (googletest) is fetched by CMake. Every
+library has its own test suite, registered with CTest, and CI builds with GCC and Clang 19, enforces clang-format 19,
+and reports coverage.
+
 ## **License**
 
 This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
