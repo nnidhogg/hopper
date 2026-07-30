@@ -44,7 +44,7 @@ public:
     /**
      * @brief The span of the current token: its first byte to one past its last.
      */
-    [[nodiscard]] Source_span span() const noexcept { return {begin_.position(), cursor_.position()}; }
+    [[nodiscard]] Source_span span() const noexcept { return {.begin = begin_.position(), .end = cursor_.position()}; }
 
     /**
      * @brief The end position of the most recently consumed token.

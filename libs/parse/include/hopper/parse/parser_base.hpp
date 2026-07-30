@@ -164,7 +164,7 @@ protected:
      */
     [[nodiscard]] Source_span span_from(const Source_position& begin) const noexcept
     {
-        return {begin, reader_.previous_end()};
+        return {.begin = begin, .end = reader_.previous_end()};
     }
 
     /**
