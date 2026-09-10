@@ -2,12 +2,13 @@
 #define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
 
 #include <filesystem>
-#include <munch/core/lexer.hpp>
-#include <munch/tools/tokenizer/token.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <munch/core/lexer.hpp>
+#include <munch/tools/tokenizer/token.hpp>
 
 #include "hopper/parse/parse_error.hpp"
 #include "hopper/parse/source_span.hpp"

@@ -1,13 +1,13 @@
 #include "hopper/parse/parser_base.hpp"
 
-#include <gtest/gtest.h>
-
 #include <cstdint>
-#include <munch/core/builder.hpp>
-#include <munch/regex/regex.hpp>
+#include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include <munch/core/builder.hpp>
+#include <munch/regex/regex.hpp>
 
 #include "hopper/parse/token_reader.hpp"
 

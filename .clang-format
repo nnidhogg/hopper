@@ -53,6 +53,15 @@ Cpp11BracedListStyle: true
 
 FixNamespaceComments: true
 IncludeBlocks: Regroup
+IncludeCategories:
+  # munch is a dependency, not a standard header: giving it its own block keeps the library this
+  # project is built on visible in every file instead of alphabetized into <cstddef> and <optional>.
+  - Regex: '^<munch/'
+    Priority: 3
+  - Regex: '^<'
+    Priority: 2
+  - Regex: '^"'
+    Priority: 4
 IndentCaseLabels: false
 IndentPPDirectives: None
 IndentWidth: 4

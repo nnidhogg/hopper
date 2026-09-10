@@ -2,6 +2,7 @@
 #define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_TOKENS_HPP
 
 #include <cstddef>
+
 #include <munch/core/lexer.hpp>
 
 namespace hopper::clike

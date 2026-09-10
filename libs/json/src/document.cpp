@@ -2,12 +2,13 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <munch/core/lexer.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <munch/core/lexer.hpp>
 
 namespace hopper::json
 {

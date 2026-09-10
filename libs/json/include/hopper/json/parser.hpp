@@ -2,11 +2,12 @@
 #define HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_PARSER_HPP
 
 #include <filesystem>
-#include <munch/core/lexer.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <munch/core/lexer.hpp>
 
 #include "hopper/json/tokens.hpp"
 #include "hopper/json/value.hpp"

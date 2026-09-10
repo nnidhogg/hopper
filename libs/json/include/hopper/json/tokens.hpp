@@ -2,6 +2,7 @@
 #define HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_TOKENS_HPP
 
 #include <cstddef>
+
 #include <munch/core/lexer.hpp>
 
 namespace hopper::json

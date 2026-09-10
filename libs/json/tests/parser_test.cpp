@@ -1,8 +1,7 @@
 #include "hopper/json/parser.hpp"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+#include <gtest/gtest.h>
 #include <string>
 
 #include "hopper/json/value.hpp"

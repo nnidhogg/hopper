@@ -1,10 +1,11 @@
 #ifndef HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_TOKEN_LOOKAHEAD_HPP
 #define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_TOKEN_LOOKAHEAD_HPP
 
-#include <munch/tools/tokenizer/token.hpp>
 #include <optional>
 #include <string_view>
 #include <utility>
+
+#include <munch/tools/tokenizer/token.hpp>
 
 #include "hopper/parse/token_location.hpp"
 

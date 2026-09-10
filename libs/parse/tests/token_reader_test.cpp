@@ -1,12 +1,12 @@
 #include "hopper/parse/token_reader.hpp"
 
-#include <gtest/gtest.h>
-
 #include <cstdint>
-#include <munch/core/builder.hpp>
-#include <munch/regex/regex.hpp>
+#include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+
+#include <munch/core/builder.hpp>
+#include <munch/regex/regex.hpp>
 
 using namespace hopper::parse;
 

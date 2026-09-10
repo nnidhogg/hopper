@@ -1,7 +1,6 @@
 #include "hopper/clike/parser.hpp"
 
 #include <gtest/gtest.h>
-
 #include <stdexcept>
 #include <string>
 #include <type_traits>

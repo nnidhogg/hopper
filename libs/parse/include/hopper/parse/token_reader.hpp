@@ -3,12 +3,13 @@
 
 #include <filesystem>
 #include <fstream>
-#include <munch/core/lexer.hpp>
-#include <munch/tools/tokenizer/tokenizer.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include <munch/core/lexer.hpp>
+#include <munch/tools/tokenizer/tokenizer.hpp>
 
 #include "hopper/parse/token_lookahead.hpp"
 
