@@ -184,8 +184,25 @@ private:
      */
     Relex relex_all();
 
+    /**
+     * @brief The text as it stands, owned because an edit rewrites it in place.
+     */
     std::string text_;
+
+    /**
+     * @brief The maximal-munch segmentation of the text, whitespace included, in offset order.
+     *
+     * Offsets rather than views into text_, so an edit that reallocates the string leaves the stream valid and the
+     * untouched tail is renumbered rather than rescanned.
+     */
     std::vector<Token> tokens_;
+
+    /**
+     * @brief Whether the stream covers every byte of the text.
+     *
+     * An incomplete stream stops the incremental path outright: there is no boundary past an edit to rejoin at when
+     * the scan that would have produced one never got there.
+     */
     bool complete_;
 };
 

@@ -3,8 +3,10 @@
 
 #include <filesystem>
 #include <munch/core/lexer.hpp>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "hopper/json/tokens.hpp"
 #include "hopper/json/value.hpp"
@@ -72,6 +74,31 @@ public:
 
 private:
     /**
+     * @brief One open container on the parser's stack.
+     *
+     * An array frame collects elements; an object frame collects members and carries the name whose value is being
+     * read, since a JSON object states the name before the value it belongs to and nothing else remembers it. The
+     * begin position is the opening bracket's, so the finished container's span can be closed at the closing one.
+     */
+    struct Frame
+    {
+        /**
+         * @brief The array or object being filled.
+         */
+        Value container;
+
+        /**
+         * @brief For an object frame, the name whose value is next; unused by an array frame.
+         */
+        std::string name;
+
+        /**
+         * @brief The opening bracket's position, which begins the container's span.
+         */
+        parse::Source_position begin;
+    };
+
+    /**
      * @brief Reads the next token or raises the end-of-input error naming what was expected.
      * @param what What the grammar expected, for the message.
      * @return The token.
@@ -85,6 +112,48 @@ private:
      * @return The value.
      */
     [[nodiscard]] Value scalar(const Token_t& token, const parse::Source_span& span);
+
+    /**
+     * @brief Reads a member name and the colon after it, leaving the reader on the member's value.
+     *
+     * Both places a member name can appear, the first of an object and each one after a comma, need exactly this,
+     * so it is stated once; the colon is consumed here because a name without one is not a member.
+     * @return The name's characters, escapes resolved.
+     */
+    [[nodiscard]] std::string read_member_name();
+
+    /**
+     * @brief Closes the container just opened if the very next token ends it.
+     *
+     * An empty container is the one case where opening and closing happen without a value in between, and both
+     * array and object need it, so neither case has to special-case its own emptiness.
+     * @param stack The parser's stack, whose top frame was just pushed.
+     * @param closer The bracket that would end this container.
+     * @return The finished empty container, or nothing when the container has contents.
+     */
+    [[nodiscard]] std::optional<Value> close_if_empty(std::vector<Frame>& stack, Token_kind closer);
+
+    /**
+     * @brief Reads the value that is due, opening a frame when it is a container.
+     *
+     * A scalar is complete the moment it is read; a container is not, so it becomes a frame and the next value due
+     * is its first element or member. Returning nothing is how that difference is reported.
+     * @param stack The parser's stack, pushed to when the value opens a container.
+     * @return The completed value, or nothing when a container opened and its contents are still to come.
+     */
+    [[nodiscard]] std::optional<Value> open_value(std::vector<Frame>& stack);
+
+    /**
+     * @brief Puts a completed value into the container on top of the stack and reads the separator after it.
+     *
+     * The separator decides what happens next, so it is read here rather than by the caller: a comma means another
+     * value is due and the frame stays open, and the closing bracket finishes the container, which then becomes the
+     * completed value for whatever frame lies beneath it.
+     * @param stack The parser's stack, whose top frame receives the value.
+     * @param completed The value to put into it.
+     * @return The finished container when it closed, or nothing when more elements or members follow.
+     */
+    [[nodiscard]] std::optional<Value> close_value(std::vector<Frame>& stack, Value completed);
 };
 } // namespace hopper::json
 

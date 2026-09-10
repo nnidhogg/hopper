@@ -12,19 +12,6 @@ namespace hopper::json
 namespace
 {
 /**
- * @brief One open container on the parser's stack.
- *
- * An array frame collects elements; an object frame collects members and carries the name whose value is being read.
- * The begin position is the opening bracket's, so the finished container's span can be closed at the closing one.
- */
-struct Frame
-{
-    Value container;
-    std::string name;
-    parse::Source_position begin;
-};
-
-/**
  * @brief The numeric value of one hex digit, already known to be one.
  * @param digit The digit character.
  * @return Its value, zero to fifteen.
@@ -42,6 +29,51 @@ std::uint32_t hex_value(const char digit)
     }
 
     return static_cast<std::uint32_t>(digit - 'A' + 10);
+}
+
+/**
+ * @brief The four hex digits at an offset, read as one code unit.
+ * @param text The string interior being scanned.
+ * @param from The offset of the first of the four digits.
+ * @return The code unit they spell.
+ */
+std::uint32_t code_unit_at(const std::string_view text, const std::size_t from)
+{
+    return (hex_value(text[from]) << 12) | (hex_value(text[from + 1]) << 8) | (hex_value(text[from + 2]) << 4) |
+           hex_value(text[from + 3]);
+}
+
+/**
+ * @brief The character a one-character escape names, or nothing when the escape is a \u.
+ *
+ * The grammar admits exactly these nine escapes, so anything that is not one of the eight here is the ninth; the
+ * caller reads that as its cue rather than testing for 'u' a second time.
+ * @param escape The character after the backslash.
+ * @return The character it names, or std::nullopt for \u.
+ */
+std::optional<char> one_character_escape(const char escape)
+{
+    switch (escape)
+    {
+    case '"':
+        return '"';
+    case '\\':
+        return '\\';
+    case '/':
+        return '/';
+    case 'b':
+        return '\b';
+    case 'f':
+        return '\f';
+    case 'n':
+        return '\n';
+    case 'r':
+        return '\r';
+    case 't':
+        return '\t';
+    default:
+        return std::nullopt;
+    }
 }
 
 /**
@@ -94,6 +126,60 @@ bool is_low_surrogate(const std::uint32_t unit) noexcept
 {
     return unit >= 0xDC00 && unit <= 0xDFFF;
 }
+
+/**
+ * @brief Appends the character a \u escape names, taking a second escape when the first is a high surrogate.
+ *
+ * A \u escape spells a UTF-16 code unit, not a character, so a code point above the basic plane arrives as two of
+ * them and only the pair names anything. Either half alone is refused: the grammar accepts the syntax, so this is
+ * the only place the document can be told that what it spelled is not a character.
+ * @param out The string appended to.
+ * @param text The string interior being scanned.
+ * @param escape The offset of the 'u', whose four digits follow it.
+ * @param span The string token's span, named in the error a lone surrogate raises.
+ * @return The offset of the escape's last digit, which the caller resumes after.
+ * @throws parse::Parse_error With kind Invalid_literal when the escape leaves a surrogate unpaired.
+ */
+std::size_t append_unicode_escape(
+        std::string& out, const std::string_view text, const std::size_t escape, const parse::Source_span& span)
+{
+    const auto unit{code_unit_at(text, escape + 1)};
+
+    const auto last{escape + 4};
+
+    if (is_low_surrogate(unit))
+    {
+        throw parse::Parse_error{
+                parse::Parse_error_kind::Invalid_literal, span,
+                "Invalid string: a low surrogate escape with no high surrogate before it"};
+    }
+
+    if (!is_high_surrogate(unit))
+    {
+        append_utf8(out, unit);
+
+        return last;
+    }
+
+    // The second escape must be there in full, so the pair needs six more bytes: a backslash, a u, and four digits.
+    const bool paired{
+            last + 6 < text.size() && text[last + 1] == '\\' && text[last + 2] == 'u' &&
+            is_low_surrogate(code_unit_at(text, last + 3))};
+
+    if (!paired)
+    {
+        throw parse::Parse_error{
+                parse::Parse_error_kind::Invalid_literal, span,
+                "Invalid string: a high surrogate escape with no low surrogate after it"};
+    }
+
+    const auto low{code_unit_at(text, last + 3)};
+
+    append_utf8(out, 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
+
+    return last + 6;
+}
+
 } // namespace
 
 Parser::Parser(Token_reader_t reader) : parse::Parser_base<Token_kind>{std::move(reader)}
@@ -105,13 +191,45 @@ Parser::Parser(const std::string& input) : Parser{Token_reader_t{lexer(), input,
 Parser::Parser(const std::filesystem::path& file) : Parser{Token_reader_t{lexer(), file, is_trivia}}
 {}
 
+Value Parser::parse()
+{
+    std::vector<Frame> stack;
+
+    std::optional<Value> completed;
+
+    // The two phases alternate: a value is due, or a value is in hand and belongs somewhere. Which one holds is
+    // exactly whether completed carries anything, so the stack and this optional are the parser's whole state.
+    while (true)
+    {
+        if (!completed)
+        {
+            completed = open_value(stack);
+
+            continue;
+        }
+
+        if (stack.empty())
+        {
+            if (const auto trailing{peek_token()})
+            {
+                syntax_error("Expected end of input after the value", *trailing);
+            }
+
+            return std::move(*completed);
+        }
+
+        completed = close_value(stack, std::move(*completed));
+    }
+}
+
 std::string Parser::unescape(const std::string_view lexeme, const parse::Source_span& span)
 {
     std::string out;
 
     out.reserve(lexeme.size());
 
-    // The interior, between the quotes; the grammar guarantees every backslash starts a complete escape.
+    // The interior, between the quotes; the grammar guarantees every backslash starts a complete escape, which is
+    // what lets this read the character after one without checking that there is a character after one.
     const auto interior{lexeme.substr(1, lexeme.size() - 2)};
 
     for (std::size_t at{0}; at < interior.size(); ++at)
@@ -119,82 +237,20 @@ std::string Parser::unescape(const std::string_view lexeme, const parse::Source_
         if (interior[at] != '\\')
         {
             out.push_back(interior[at]);
+
             continue;
         }
 
         ++at;
 
-        switch (interior[at])
+        if (const auto simple{one_character_escape(interior[at])})
         {
-        case '"':
-            out.push_back('"');
-            break;
-        case '\\':
-            out.push_back('\\');
-            break;
-        case '/':
-            out.push_back('/');
-            break;
-        case 'b':
-            out.push_back('\b');
-            break;
-        case 'f':
-            out.push_back('\f');
-            break;
-        case 'n':
-            out.push_back('\n');
-            break;
-        case 'r':
-            out.push_back('\r');
-            break;
-        case 't':
-            out.push_back('\t');
-            break;
-        default:
-        {
-            // A \u escape: four hex digits follow the u, and a high surrogate must be followed by a low one in a
-            // second \u escape to name a character.
-            const auto unit_at{[&](const std::size_t from) {
-                return (hex_value(interior[from]) << 12) | (hex_value(interior[from + 1]) << 8) |
-                       (hex_value(interior[from + 2]) << 4) | hex_value(interior[from + 3]);
-            }};
+            out.push_back(*simple);
 
-            const auto unit{unit_at(at + 1)};
-
-            at += 4;
-
-            if (is_low_surrogate(unit))
-            {
-                throw parse::Parse_error{
-                        parse::Parse_error_kind::Invalid_literal, span,
-                        "Invalid string: a low surrogate escape with no high surrogate before it"};
-            }
-
-            if (!is_high_surrogate(unit))
-            {
-                append_utf8(out, unit);
-                break;
-            }
-
-            const bool paired{
-                    at + 6 < interior.size() && interior[at + 1] == '\\' && interior[at + 2] == 'u' &&
-                    is_low_surrogate(unit_at(at + 3))};
-
-            if (!paired)
-            {
-                throw parse::Parse_error{
-                        parse::Parse_error_kind::Invalid_literal, span,
-                        "Invalid string: a high surrogate escape with no low surrogate after it"};
-            }
-
-            const auto low{unit_at(at + 3)};
-
-            at += 6;
-
-            append_utf8(out, 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
-            break;
+            continue;
         }
-        }
+
+        at = append_unicode_escape(out, interior, at, span);
     }
 
     return out;
@@ -229,123 +285,123 @@ Value Parser::scalar(const Token_t& token, const parse::Source_span& span)
     }
 }
 
-Value Parser::parse()
+std::string Parser::read_member_name()
 {
-    std::vector<Frame> stack;
+    const auto begin{mark()};
 
-    std::optional<Value> completed;
+    const auto name{expect(Token_kind::String, "a member name")};
 
-    while (true)
+    auto text{unescape(name.lexeme(), span_from(begin))};
+
+    (void)expect(Token_kind::Colon, "':' after the member name");
+
+    return text;
+}
+
+std::optional<Value> Parser::close_if_empty(std::vector<Frame>& stack, const Token_kind closer)
+{
+    if (!accept(closer))
     {
-        if (!completed)
+        return std::nullopt;
+    }
+
+    auto container{std::move(stack.back().container)};
+
+    container.span = span_from(stack.back().begin);
+
+    stack.pop_back();
+
+    return container;
+}
+
+std::optional<Value> Parser::open_value(std::vector<Frame>& stack)
+{
+    const auto begin{mark()};
+
+    const auto token{next_or_end("a value")};
+
+    switch (token.kind())
+    {
+    case Token_kind::Left_bracket:
+        stack.push_back({.container = Value{Array{}, {}}, .name = {}, .begin = begin});
+
+        return close_if_empty(stack, Token_kind::Right_bracket);
+
+    case Token_kind::Left_brace:
+    {
+        stack.push_back({.container = Value{Object{}, {}}, .name = {}, .begin = begin});
+
+        auto empty{close_if_empty(stack, Token_kind::Right_brace)};
+
+        // A non-empty object states its first name before its first value, so the frame takes it now; an array has
+        // nothing to read here, which is the only difference between the two cases.
+        if (!empty)
         {
-            // A value is due: either the document's, the next element's, or a member's after its colon.
-            const auto begin{mark()};
-
-            const auto token{next_or_end("a value")};
-
-            switch (token.kind())
-            {
-            case Token_kind::Left_bracket:
-                stack.push_back({.container = Value{Array{}, {}}, .name = {}, .begin = begin});
-
-                if (accept(Token_kind::Right_bracket))
-                {
-                    completed = std::move(stack.back().container);
-                    completed->span = span_from(begin);
-                    stack.pop_back();
-                }
-
-                continue;
-            case Token_kind::Left_brace:
-                stack.push_back({.container = Value{Object{}, {}}, .name = {}, .begin = begin});
-
-                if (accept(Token_kind::Right_brace))
-                {
-                    completed = std::move(stack.back().container);
-                    completed->span = span_from(begin);
-                    stack.pop_back();
-                    continue;
-                }
-
-                {
-                    const auto name_begin{mark()};
-                    const auto name{expect(Token_kind::String, "a member name")};
-                    stack.back().name = unescape(name.lexeme(), span_from(name_begin));
-                    (void)expect(Token_kind::Colon, "':' after the member name");
-                }
-
-                continue;
-            case Token_kind::String:
-            case Token_kind::Number:
-            case Token_kind::True:
-            case Token_kind::False:
-            case Token_kind::Null:
-                completed = scalar(token, span_from(begin));
-                continue;
-            default:
-                syntax_error("Expected a value", token);
-            }
+            stack.back().name = read_member_name();
         }
 
-        // A value is complete: it is the document, or it belongs to the open container on top of the stack.
-        if (stack.empty())
-        {
-            if (const auto trailing{peek_token()})
-            {
-                syntax_error("Expected end of input after the value", *trailing);
-            }
-
-            return std::move(*completed);
-        }
-
-        auto& top{stack.back()};
-
-        if (auto* const array{std::get_if<Array>(&top.container.node)})
-        {
-            array->elements.push_back(std::move(*completed));
-            completed.reset();
-
-            const auto token{next_or_end("',' or ']'")};
-
-            if (token.kind() == Token_kind::Comma)
-            {
-                continue;
-            }
-
-            if (token.kind() != Token_kind::Right_bracket)
-            {
-                syntax_error("Expected ',' or ']'", token);
-            }
-        }
-        else
-        {
-            auto& object{std::get<Object>(top.container.node)};
-
-            object.members.push_back({.name = std::move(top.name), .value = std::move(*completed)});
-            completed.reset();
-
-            const auto token{next_or_end("',' or '}'")};
-
-            if (token.kind() == Token_kind::Comma)
-            {
-                const auto name_begin{mark()};
-                const auto name{expect(Token_kind::String, "a member name")};
-                top.name = unescape(name.lexeme(), span_from(name_begin));
-                (void)expect(Token_kind::Colon, "':' after the member name");
-                continue;
-            }
-
-            if (token.kind() != Token_kind::Right_brace)
-            {
-                syntax_error("Expected ',' or '}'", token);
-            }
-        }
-
-        // The container closed: it is the completed value for the frame below it.
-        completed = std::move(top.container);
-        completed->span = span_from(top.begin);
-        stack.pop_back();
+        return empty;
+    }
+    case Token_kind::String:
+    case Token_kind::Number:
+    case Token_kind::True:
+    case Token_kind::False:
+    case Token_kind::Null:
+        return scalar(token, span_from(begin));
+    default:
+        syntax_error("Expected a value", token);
     }
 }
+
+std::optional<Value> Parser::close_value(std::vector<Frame>& stack, Value completed)
+{
+    auto& top{stack.back()};
+
+    if (auto* const array{std::get_if<Array>(&top.container.node)})
+    {
+        array->elements.push_back(std::move(completed));
+
+        const auto token{next_or_end("',' or ']'")};
+
+        if (token.kind() == Token_kind::Comma)
+        {
+            return std::nullopt;
+        }
+
+        if (token.kind() != Token_kind::Right_bracket)
+        {
+            syntax_error("Expected ',' or ']'", token);
+        }
+    }
+    else
+    {
+        // Only arrays and objects are ever pushed, so the frame that is not an array is an object.
+        auto& object{std::get<Object>(top.container.node)};
+
+        object.members.push_back({.name = std::move(top.name), .value = std::move(completed)});
+
+        const auto token{next_or_end("',' or '}'")};
+
+        if (token.kind() == Token_kind::Comma)
+        {
+            top.name = read_member_name();
+
+            return std::nullopt;
+        }
+
+        if (token.kind() != Token_kind::Right_brace)
+        {
+            syntax_error("Expected ',' or '}'", token);
+        }
+    }
+
+    auto container{std::move(top.container)};
+
+    container.span = span_from(top.begin);
+
+    stack.pop_back();
+
+    return container;
+}
+
 } // namespace hopper::json
