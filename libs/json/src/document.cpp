@@ -15,6 +15,10 @@ namespace
 {
 /**
  * @brief The compiled JSON lexer, built once and shared by every document.
+ *
+ * Compiling the token set walks the whole regex-to-DFA pipeline, which costs far more than tokenizing a small
+ * document; the tables are immutable once built and the scan carries no state across calls, so one instance serves
+ * every document on every thread.
  * @return The lexer.
  */
 const munch::core::Lexer& shared_lexer()
@@ -32,11 +36,44 @@ const munch::core::Lexer& shared_lexer()
  */
 constexpr std::size_t search_budget{4096};
 
+/**
+ * @brief The reach the anchor search starts at, before widening.
+ *
+ * Small enough that the common case, a structural byte within a token or two of the edit, costs one short walk, and
+ * the widening below is what keeps a rarer case from paying the whole budget up front.
+ */
+constexpr std::size_t initial_reach{64};
+
 } // namespace
 
 Document::Document(std::string text) : text_{std::move(text)}, tokens_{}, complete_{false}
 {
     relex_all();
+}
+
+Document::Relex Document::edit(const std::size_t offset, const std::size_t removed, const std::string_view inserted)
+{
+    if (offset > text_.size() || removed > text_.size() - offset)
+    {
+        throw std::out_of_range{"Document::edit: the range lies outside the text"};
+    }
+
+    // The anchor is decided against the old text, before the replacement, because that is the text whose tokens are
+    // being kept: a certificate found in the new bytes would say nothing about the stream already in hand.
+    const auto anchor{find_anchor(offset)};
+
+    const auto old_edit_end{offset + removed};
+
+    text_.replace(offset, removed, inserted);
+
+    // An incomplete stream has no boundary past the edit to rejoin at, since the old scan never reached one, and no
+    // anchor means nothing before the edit is proved to survive it. Either way only a whole relex is defensible.
+    if (!complete_ || !anchor)
+    {
+        return relex_all();
+    }
+
+    return relex_tail(*anchor, offset + inserted.size(), old_edit_end);
 }
 
 bool Document::scan(const std::size_t from, std::vector<Token>& out) const
@@ -51,6 +88,7 @@ bool Document::scan(const std::size_t from, std::vector<Token>& out) const
     {
         const auto match{lexer.tokenize<Token_kind>(view.substr(at))};
 
+        // A zero-width match would leave the position where it is, so it ends the scan exactly as no match does.
         if (!match.token || match.length == 0)
         {
             return false;
@@ -64,38 +102,21 @@ bool Document::scan(const std::size_t from, std::vector<Token>& out) const
     return true;
 }
 
-Document::Relex Document::relex_all()
+std::optional<std::size_t> Document::find_anchor(const std::size_t offset) const
 {
-    tokens_.clear();
-
-    complete_ = scan(0, tokens_);
-
-    return {.rescanned = text_.size(), .whole = true};
-}
-
-Document::Relex Document::edit(const std::size_t offset, const std::size_t removed, const std::string_view inserted)
-{
-    if (offset > text_.size() || removed > text_.size() - offset)
-    {
-        throw std::out_of_range{"Document::edit: the range lies outside the text"};
-    }
-
-    // The anchor: the last certified start whose evidence the edit does not touch. The certificate walk only runs
-    // forward, so the search starts a reach before the edit and keeps the last answer whose evidence ends at or
-    // before it, widening the reach when a stretch certifies nothing, so a nearby anchor costs a short walk and only
-    // a long certificate-free stretch pays for the whole budget.
     const auto& lexer{shared_lexer()};
 
-    const std::string_view old_view{text_};
+    const std::string_view view{text_};
 
     std::optional<std::size_t> anchor;
 
-    for (std::size_t reach{64}; !anchor && reach <= search_budget; reach *= 4)
+    for (auto reach{initial_reach}; !anchor && reach <= search_budget; reach *= 4)
     {
         for (auto from{offset > reach ? offset - reach : 0}; from <= offset;)
         {
-            const auto found{lexer.next_certified_evidence(old_view, from)};
+            const auto found{lexer.next_certified_evidence(view, from)};
 
+            // The walk only runs forward, so once it reports a start past the edit there is nothing nearer to find.
             if (!found || found->start > offset)
             {
                 break;
@@ -109,67 +130,52 @@ Document::Relex Document::edit(const std::size_t offset, const std::size_t remov
             from = found->start + 1;
         }
 
+        // A reach that already covers the whole prefix has nothing left to widen into.
         if (reach >= offset)
         {
             break;
         }
     }
 
-    const auto old_size{text_.size()};
+    return anchor;
+}
 
-    text_.replace(offset, removed, inserted);
-
-    if (!complete_ || !anchor)
-    {
-        return relex_all();
-    }
-
-    // The old tokens before the anchor stay; the old tokens from the first boundary at or after the replaced range
-    // are candidates to rejoin, shifted by the edit's size change.
-    const auto first_after{
-            std::ranges::lower_bound(tokens_, offset + removed, {}, [](const Token& token) { return token.offset; })};
-
-    const auto keep_before{
-            std::ranges::lower_bound(tokens_, *anchor, {}, [](const Token& token) { return token.offset; })};
-
-    std::vector<Token> fresh(tokens_.begin(), keep_before);
+Document::Relex Document::relex_tail(
+        const std::size_t anchor, const std::size_t edit_end, const std::size_t old_edit_end)
+{
+    const auto& lexer{shared_lexer()};
 
     const std::string_view view{text_};
 
-    const auto delta{static_cast<std::ptrdiff_t>(text_.size()) - static_cast<std::ptrdiff_t>(old_size)};
+    // Positions at or after edit_end name the same bytes they did before the edit, only moved; exchanging the two
+    // ends converts between the texts without a signed delta, and nothing before edit_end is ever converted.
+    const auto in_old_text{[=](const std::size_t at) { return at - edit_end + old_edit_end; }};
 
-    const auto edit_end{offset + inserted.size()};
+    // The old tokens before the anchor stand as they were; the first old token starting at or after the replaced
+    // range is the earliest that could still be reached, so the search for a shared boundary starts there.
+    const auto keep_before{std::ranges::lower_bound(tokens_, anchor, {}, &Token::offset)};
 
-    auto rejoin{first_after};
+    auto rejoin{std::ranges::lower_bound(tokens_, old_edit_end, {}, &Token::offset)};
 
-    std::size_t at{*anchor};
+    std::vector<Token> fresh(tokens_.begin(), keep_before);
+
+    std::size_t at{anchor};
 
     while (at < view.size())
     {
-        // Past the edit, the first boundary the old stream also had is where the two scans agree from then on.
-        if (at >= edit_end)
+        // The cursor only moves forward, so each step resumes the search where the last one stopped rather than
+        // scanning the old stream again; the shared boundary, if there is one, is at or after where it stands.
+        const auto shared{at >= edit_end ? in_old_text(at) : old_edit_end};
+
+        rejoin = std::ranges::lower_bound(rejoin, tokens_.end(), shared, {}, &Token::offset);
+
+        if (at >= edit_end && rejoin != tokens_.end() && rejoin->offset == shared)
         {
-            while (rejoin != tokens_.end() &&
-                   static_cast<std::ptrdiff_t>(rejoin->offset) + delta < static_cast<std::ptrdiff_t>(at))
-            {
-                ++rejoin;
-            }
+            take_old_tail(fresh, rejoin, edit_end, old_edit_end);
 
-            if (rejoin != tokens_.end() &&
-                static_cast<std::ptrdiff_t>(rejoin->offset) + delta == static_cast<std::ptrdiff_t>(at))
-            {
-                for (auto it{rejoin}; it != tokens_.end(); ++it)
-                {
-                    fresh.push_back(
-                            {.kind = it->kind,
-                             .offset = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(it->offset) + delta),
-                             .length = it->length});
-                }
+            tokens_ = std::move(fresh);
 
-                tokens_ = std::move(fresh);
-
-                return {.rescanned = at - *anchor, .whole = false};
-            }
+            return {.rescanned = at - anchor, .whole = false};
         }
 
         const auto match{lexer.tokenize<Token_kind>(view.substr(at))};
@@ -184,9 +190,29 @@ Document::Relex Document::edit(const std::size_t offset, const std::size_t remov
         at += match.length;
     }
 
+    // The scan ran to the end without meeting a shared boundary, so the new stream is the whole tail.
     tokens_ = std::move(fresh);
 
-    return {.rescanned = at - *anchor, .whole = false};
+    return {.rescanned = at - anchor, .whole = false};
+}
+
+void Document::take_old_tail(
+        std::vector<Token>& out, const std::vector<Token>::const_iterator from, const std::size_t edit_end,
+        const std::size_t old_edit_end) const
+{
+    for (auto it{from}; it != tokens_.end(); ++it)
+    {
+        out.push_back({.kind = it->kind, .offset = it->offset - old_edit_end + edit_end, .length = it->length});
+    }
+}
+
+Document::Relex Document::relex_all()
+{
+    tokens_.clear();
+
+    complete_ = scan(0, tokens_);
+
+    return {.rescanned = text_.size(), .whole = true};
 }
 
 } // namespace hopper::json
