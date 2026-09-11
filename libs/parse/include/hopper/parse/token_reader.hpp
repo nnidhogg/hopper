@@ -139,7 +139,7 @@ public:
      */
     [[nodiscard]] Result_t peek()
     {
-        if (const auto& token = lookahead_.token(); token)
+        if (const auto& token{lookahead_.token()}; token)
         {
             return *token;
         }
