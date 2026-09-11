@@ -40,6 +40,10 @@ protected:
      */
     explicit Parser_base(Token_reader<Kind> reader) : reader_{std::move(reader)} {}
 
+    /**
+     * @brief Protected like the constructor: the base is a mixin for a grammar, never a handle a caller deletes
+     *        through, so it needs no virtual destructor.
+     */
     ~Parser_base() = default;
 
     /**
@@ -202,7 +206,9 @@ protected:
     {
         const auto& at{reader_.previous_end()};
 
-        throw Parse_error{Parse_error_kind::Unexpected_end, {at, at}, "Syntax error: " + std::string(message)};
+        throw Parse_error{
+                Parse_error_kind::Unexpected_end, Source_span{.begin = at, .end = at},
+                "Syntax error: " + std::string(message)};
     }
 
     /**
@@ -213,7 +219,7 @@ protected:
     {
         const auto at{reader_.span().end};
 
-        throw Parse_error{Parse_error_kind::Lexical, {at, at}, "Lexical error: " + message};
+        throw Parse_error{Parse_error_kind::Lexical, Source_span{.begin = at, .end = at}, "Lexical error: " + message};
     }
 
     /**
@@ -230,6 +236,9 @@ protected:
     [[nodiscard]] std::optional<munch::core::Lexer::Certified_start> recover() { return reader_.recover(); }
 
 private:
+    /**
+     * @brief The token stream the grammar reads.
+     */
     Token_reader<Kind> reader_;
 };
 

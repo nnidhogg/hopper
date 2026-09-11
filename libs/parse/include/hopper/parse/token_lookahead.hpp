@@ -96,8 +96,6 @@ public:
     {
         token_.emplace(kind, lexeme);
 
-        // The exposed location is where this token begins; the cursor runs ahead over the lexeme so the next
-        // token's beginning is already known.
         begin_ = cursor_;
 
         cursor_.advance(lexeme);
@@ -117,12 +115,24 @@ public:
     }
 
 private:
+    /**
+     * @brief The buffered token, or nothing between reads.
+     */
     std::optional<Token_t> token_;
 
+    /**
+     * @brief Where the buffered token begins.
+     */
     Token_location begin_;
 
+    /**
+     * @brief Where the cursor stands after the buffered token, which is where the next one begins.
+     */
     Token_location cursor_;
 
+    /**
+     * @brief Where the most recently consumed token ended.
+     */
     Source_position previous_end_{};
 };
 

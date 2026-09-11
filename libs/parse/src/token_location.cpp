@@ -2,9 +2,6 @@
 
 namespace hopper::parse
 {
-Token_location::Token_location() : line_{1}, column_{1}, offset_{0}
-{}
-
 std::size_t Token_location::line() const noexcept
 {
     return line_;
@@ -18,6 +15,11 @@ std::size_t Token_location::column() const noexcept
 std::size_t Token_location::offset() const noexcept
 {
     return offset_;
+}
+
+Source_position Token_location::position() const noexcept
+{
+    return {.offset = offset_, .line = line_, .column = column_};
 }
 
 void Token_location::reset() noexcept
@@ -46,11 +48,6 @@ void Token_location::advance(const std::string_view lexeme) noexcept
     }
 
     offset_ += lexeme.size();
-}
-
-Source_position Token_location::position() const noexcept
-{
-    return {.offset = offset_, .line = line_, .column = column_};
 }
 
 } // namespace hopper::parse

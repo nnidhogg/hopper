@@ -32,6 +32,9 @@ class Parse_error : public std::runtime_error
 public:
     /**
      * @brief Constructs an error from its kind, the span it points at, and a human-readable message.
+     * @param kind What went wrong.
+     * @param span The source range the error points at.
+     * @param message The message, which what() prefixes with the span's line and column.
      */
     Parse_error(Parse_error_kind kind, const Source_span& span, const std::string& message);
 
@@ -46,8 +49,14 @@ public:
     [[nodiscard]] const Source_span& span() const noexcept;
 
 private:
+    /**
+     * @brief What went wrong.
+     */
     Parse_error_kind kind_;
 
+    /**
+     * @brief The source range the error points at.
+     */
     Source_span span_;
 };
 

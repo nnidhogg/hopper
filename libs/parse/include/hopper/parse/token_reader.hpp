@@ -71,7 +71,8 @@ public:
     {}
 
     /**
-     * @brief Replace the current input and reset tokenization state.
+     * @brief Replaces the current input and rewinds, so one reader and its compiled lexer serve many inputs.
+     * @param input The new text.
      */
     void load(const std::string& input)
     {
@@ -81,7 +82,9 @@ public:
     }
 
     /**
-     * @brief Load new input from a file path.
+     * @brief Replaces the current input with a file's contents and rewinds.
+     * @param file The file to read.
+     * @throws std::runtime_error If the file cannot be opened.
      */
     void load(const std::filesystem::path& file)
     {
@@ -91,7 +94,7 @@ public:
     }
 
     /**
-     * @brief Reset the reading position to the beginning of the current input.
+     * @brief Rewinds to the beginning of the current input.
      */
     void reset() noexcept
     {
@@ -218,10 +221,19 @@ private:
         throw std::runtime_error("Token_reader: cannot open file: " + file.string());
     }
 
+    /**
+     * @brief The cursor over the input, owning the compiled lexer.
+     */
     munch::tools::tokenizer::Tokenizer tokenizer_;
 
+    /**
+     * @brief The one token read ahead of the caller, with the positions around it.
+     */
     Token_lookahead<Kind> lookahead_;
 
+    /**
+     * @brief The kinds discarded before the caller sees them; nullptr discards nothing.
+     */
     Skip_t skip_;
 };
 

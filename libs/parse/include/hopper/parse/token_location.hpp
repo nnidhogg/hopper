@@ -20,7 +20,7 @@ public:
     /**
      * @brief Constructs the position of the input's first byte: line one, column one, offset zero.
      */
-    Token_location();
+    Token_location() = default;
 
     /**
      * @brief The line, counted from one.
@@ -61,9 +61,20 @@ public:
     void advance(std::string_view lexeme) noexcept;
 
 private:
-    std::size_t line_;
-    std::size_t column_;
-    std::size_t offset_;
+    /**
+     * @brief The line, counted from one.
+     */
+    std::size_t line_{1};
+
+    /**
+     * @brief The column within the line, counted from one in bytes.
+     */
+    std::size_t column_{1};
+
+    /**
+     * @brief The byte offset from the start of the input, counted from zero.
+     */
+    std::size_t offset_{0};
 };
 
 } // namespace hopper::parse
