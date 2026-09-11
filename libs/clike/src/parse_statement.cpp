@@ -1,5 +1,8 @@
+#include <array>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -33,29 +36,21 @@ ast::Stmt Parser::parse_statement_node()
         return parse_compound_statement();
     }
 
-    if (check_keyword("if"))
-    {
-        return parse_if_statement();
-    }
+    // The statements a keyword opens, dispatched by the keyword; each parser expects its own keyword again.
+    static constexpr std::array<std::pair<std::string_view, ast::Stmt (Parser::*)()>, 5> keyworded{{
+            {"if", &Parser::parse_if_statement},
+            {"while", &Parser::parse_while_statement},
+            {"for", &Parser::parse_for_statement},
+            {"do", &Parser::parse_do_statement},
+            {"return", &Parser::parse_return_statement},
+    }};
 
-    if (check_keyword("while"))
+    for (const auto& [word, parse] : keyworded)
     {
-        return parse_while_statement();
-    }
-
-    if (check_keyword("for"))
-    {
-        return parse_for_statement();
-    }
-
-    if (check_keyword("do"))
-    {
-        return parse_do_statement();
-    }
-
-    if (check_keyword("return"))
-    {
-        return parse_return_statement();
+        if (check_keyword(word))
+        {
+            return (this->*parse)();
+        }
     }
 
     if (is_declaration_start())
@@ -68,11 +63,7 @@ ast::Stmt Parser::parse_statement_node()
         return {.node = ast::Empty{}, .span = close(begin)};
     }
 
-    auto expr{parse_assignment()};
-
-    expect_punctuation(';', "';' after the expression");
-
-    return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(begin)};
+    return parse_expression_statement("the expression");
 }
 
 ast::Stmt Parser::parse_compound_statement()
@@ -155,25 +146,7 @@ ast::Stmt Parser::parse_for_statement()
     expect_keyword("for", "'for'");
     expect_punctuation('(', "'(' after 'for'");
 
-    auto init{[this]() -> ast::Stmt {
-        const auto init_begin{here()};
-
-        if (accept_punctuation(';'))
-        {
-            return {.node = ast::Empty{}, .span = close(init_begin)};
-        }
-
-        if (is_declaration_start())
-        {
-            return parse_declaration_statement();
-        }
-
-        auto expr{parse_assignment()};
-
-        expect_punctuation(';', "';' after the loop initializer");
-
-        return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(init_begin)};
-    }()};
+    auto init{parse_for_initializer()};
 
     std::optional<ast::Expr> condition;
 
@@ -203,6 +176,23 @@ ast::Stmt Parser::parse_for_statement()
                             .body = std::make_unique<ast::Stmt>(std::move(body)),
                     },
             .span = close(begin)};
+}
+
+ast::Stmt Parser::parse_for_initializer()
+{
+    const auto begin{here()};
+
+    if (accept_punctuation(';'))
+    {
+        return {.node = ast::Empty{}, .span = close(begin)};
+    }
+
+    if (is_declaration_start())
+    {
+        return parse_declaration_statement();
+    }
+
+    return parse_expression_statement("the loop initializer");
 }
 
 ast::Stmt Parser::parse_do_statement()
@@ -245,5 +235,16 @@ ast::Stmt Parser::parse_return_statement()
     expect_punctuation(';', "';' after the return value");
 
     return {.node = ast::Return{.value = std::move(value)}, .span = close(begin)};
+}
+
+ast::Stmt Parser::parse_expression_statement(const std::string_view what)
+{
+    const auto begin{here()};
+
+    auto expr{parse_assignment()};
+
+    expect_punctuation(';', "';' after " + std::string{what});
+
+    return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(begin)};
 }
 } // namespace hopper::clike

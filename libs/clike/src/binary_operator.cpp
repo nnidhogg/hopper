@@ -1,11 +1,40 @@
 #include "hopper/clike/binary_operator.hpp"
 
+#include <algorithm>
 #include <array>
+#include <utility>
 
 namespace hopper::clike
 {
 namespace
 {
+/**
+ * @brief The precedence ladder, one entry per binary operator spelling.
+ *
+ * A table rather than a chain of comparisons, so the ladder reads as the grammar states it, rung by rung, and adding
+ * an operator is one line that cannot fall out of order.
+ */
+constexpr std::array<std::pair<std::string_view, Binary_operator>, 18> ladder{{
+        {"||", {.precedence = 1, .op = ast::Binary_op::Logical_or}},
+        {"&&", {.precedence = 2, .op = ast::Binary_op::Logical_and}},
+        {"|", {.precedence = 3, .op = ast::Binary_op::Bitwise_or}},
+        {"^", {.precedence = 4, .op = ast::Binary_op::Bitwise_xor}},
+        {"&", {.precedence = 5, .op = ast::Binary_op::Bitwise_and}},
+        {"==", {.precedence = 6, .op = ast::Binary_op::Equal}},
+        {"!=", {.precedence = 6, .op = ast::Binary_op::Not_equal}},
+        {"<", {.precedence = 7, .op = ast::Binary_op::Less}},
+        {">", {.precedence = 7, .op = ast::Binary_op::Greater}},
+        {"<=", {.precedence = 7, .op = ast::Binary_op::Less_equal}},
+        {">=", {.precedence = 7, .op = ast::Binary_op::Greater_equal}},
+        {"<<", {.precedence = 8, .op = ast::Binary_op::Shift_left}},
+        {">>", {.precedence = 8, .op = ast::Binary_op::Shift_right}},
+        {"+", {.precedence = 9, .op = ast::Binary_op::Add}},
+        {"-", {.precedence = 9, .op = ast::Binary_op::Subtract}},
+        {"*", {.precedence = 10, .op = ast::Binary_op::Multiply}},
+        {"/", {.precedence = 10, .op = ast::Binary_op::Divide}},
+        {"%", {.precedence = 10, .op = ast::Binary_op::Modulo}},
+}};
+
 /**
  * @brief Every operator spelling the language knows, the assignment and unary forms included, for prefix fusion.
  */
@@ -16,109 +45,14 @@ constexpr std::array<std::string_view, 34> operators{
 
 std::optional<Binary_operator> binary_operator_for(const std::string_view spelling)
 {
-    if (spelling == "||")
-    {
-        return Binary_operator{1, ast::Binary_op::Logical_or};
-    }
+    const auto found{std::ranges::find(ladder, spelling, &std::pair<std::string_view, Binary_operator>::first)};
 
-    if (spelling == "&&")
-    {
-        return Binary_operator{2, ast::Binary_op::Logical_and};
-    }
-
-    if (spelling == "|")
-    {
-        return Binary_operator{3, ast::Binary_op::Bitwise_or};
-    }
-
-    if (spelling == "^")
-    {
-        return Binary_operator{4, ast::Binary_op::Bitwise_xor};
-    }
-
-    if (spelling == "&")
-    {
-        return Binary_operator{5, ast::Binary_op::Bitwise_and};
-    }
-
-    if (spelling == "==")
-    {
-        return Binary_operator{6, ast::Binary_op::Equal};
-    }
-
-    if (spelling == "!=")
-    {
-        return Binary_operator{6, ast::Binary_op::Not_equal};
-    }
-
-    if (spelling == "<")
-    {
-        return Binary_operator{7, ast::Binary_op::Less};
-    }
-
-    if (spelling == ">")
-    {
-        return Binary_operator{7, ast::Binary_op::Greater};
-    }
-
-    if (spelling == "<=")
-    {
-        return Binary_operator{7, ast::Binary_op::Less_equal};
-    }
-
-    if (spelling == ">=")
-    {
-        return Binary_operator{7, ast::Binary_op::Greater_equal};
-    }
-
-    if (spelling == "<<")
-    {
-        return Binary_operator{8, ast::Binary_op::Shift_left};
-    }
-
-    if (spelling == ">>")
-    {
-        return Binary_operator{8, ast::Binary_op::Shift_right};
-    }
-
-    if (spelling == "+")
-    {
-        return Binary_operator{9, ast::Binary_op::Add};
-    }
-
-    if (spelling == "-")
-    {
-        return Binary_operator{9, ast::Binary_op::Subtract};
-    }
-
-    if (spelling == "*")
-    {
-        return Binary_operator{10, ast::Binary_op::Multiply};
-    }
-
-    if (spelling == "/")
-    {
-        return Binary_operator{10, ast::Binary_op::Divide};
-    }
-
-    if (spelling == "%")
-    {
-        return Binary_operator{10, ast::Binary_op::Modulo};
-    }
-
-    return std::nullopt;
+    return found != ladder.end() ? std::optional{found->second} : std::nullopt;
 }
 
 bool is_operator_prefix(const std::string_view spelling) noexcept
 {
-    for (const auto candidate : operators)
-    {
-        if (candidate.starts_with(spelling))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::ranges::any_of(
+            operators, [spelling](const std::string_view candidate) { return candidate.starts_with(spelling); });
 }
 } // namespace hopper::clike

@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <memory>
 #include <optional>
@@ -15,14 +17,104 @@ namespace hopper::clike
 namespace
 {
 /**
+ * @brief The prefix operators, in the order the parser tries them.
+ */
+constexpr std::array<std::pair<std::string_view, ast::Unary_op>, 8> prefixes{{
+        {"+", ast::Unary_op::Plus},
+        {"-", ast::Unary_op::Minus},
+        {"!", ast::Unary_op::Not},
+        {"~", ast::Unary_op::Bitwise_not},
+        {"++", ast::Unary_op::Pre_increment},
+        {"--", ast::Unary_op::Pre_decrement},
+        {"&", ast::Unary_op::Address_of},
+        {"*", ast::Unary_op::Dereference},
+}};
+
+/**
+ * @brief The assignment operators and what each performs.
+ */
+constexpr std::array<std::pair<std::string_view, ast::Assign_op>, 11> assignments{{
+        {"=", ast::Assign_op::Assign},
+        {"+=", ast::Assign_op::Add},
+        {"-=", ast::Assign_op::Subtract},
+        {"*=", ast::Assign_op::Multiply},
+        {"/=", ast::Assign_op::Divide},
+        {"%=", ast::Assign_op::Modulo},
+        {"&=", ast::Assign_op::Bitwise_and},
+        {"|=", ast::Assign_op::Bitwise_or},
+        {"^=", ast::Assign_op::Bitwise_xor},
+        {"<<=", ast::Assign_op::Shift_left},
+        {">>=", ast::Assign_op::Shift_right},
+}};
+
+/**
+ * @brief The four cast keywords and the cast each selects.
+ */
+constexpr std::array<std::pair<std::string_view, ast::Cast_kind>, 4> casts{{
+        {"static_cast", ast::Cast_kind::Static},
+        {"dynamic_cast", ast::Cast_kind::Dynamic},
+        {"const_cast", ast::Cast_kind::Const},
+        {"reinterpret_cast", ast::Cast_kind::Reinterpret},
+}};
+
+/**
+ * @brief Looks a spelling up in one of the tables above.
+ * @tparam Table The table's type.
+ * @param table The table.
+ * @param spelling The spelling looked for.
+ * @return The entry's value, or std::nullopt when the spelling is not in the table.
+ */
+template <typename Table>
+[[nodiscard]] auto lookup(const Table& table, const std::string_view spelling)
+        -> std::optional<typename Table::value_type::second_type>
+{
+    const auto found{std::ranges::find(table, spelling, &Table::value_type::first)};
+
+    return found != table.end() ? std::optional{found->second} : std::nullopt;
+}
+
+/**
+ * @brief The value an integer literal spells, when the platform's integer holds it.
+ *
+ * Read with std::from_chars rather than a library conversion that throws, so an overflow is the parser's syntax
+ * error at the token and not an exception with no position.
+ * @param lexeme The literal's digits.
+ * @return The value, or std::nullopt when it is out of range.
+ */
+[[nodiscard]] std::optional<long long> integer_value(const std::string_view lexeme)
+{
+    long long value{};
+
+    const auto [end, error]{std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value)};
+
+    if (error != std::errc{} || end != lexeme.data() + lexeme.size())
+    {
+        return std::nullopt;
+    }
+
+    return value;
+}
+
+/**
  * @brief Wraps an operand in a unary node.
  * @param op The operator applied.
  * @param operand The operand.
  * @return The node, its span unset.
  */
-ast::Expr make_unary(const ast::Unary_op op, ast::Expr operand)
+[[nodiscard]] ast::Expr make_unary(const ast::Unary_op op, ast::Expr operand)
 {
     return {.node = ast::Unary{.op = op, .operand = std::make_unique<ast::Expr>(std::move(operand))}};
+}
+
+/**
+ * @brief Wraps an operand in a postfix node.
+ * @param op The operator applied.
+ * @param operand The operand.
+ * @return The node, its span unset.
+ */
+[[nodiscard]] ast::Expr make_postfix(const ast::Postfix_op op, ast::Expr operand)
+{
+    return {.node = ast::Postfix{.op = op, .operand = std::make_unique<ast::Expr>(std::move(operand))}};
 }
 
 /**
@@ -32,7 +124,7 @@ ast::Expr make_unary(const ast::Unary_op op, ast::Expr operand)
  * @param rhs The right operand.
  * @return The node, its span unset.
  */
-ast::Expr make_binary(const ast::Binary_op op, ast::Expr lhs, ast::Expr rhs)
+[[nodiscard]] ast::Expr make_binary(const ast::Binary_op op, ast::Expr lhs, ast::Expr rhs)
 {
     return {.node = ast::Binary{
                     .op = op,
@@ -48,7 +140,7 @@ ast::Expr make_binary(const ast::Binary_op op, ast::Expr lhs, ast::Expr rhs)
  * @param value The assigned value.
  * @return The node, its span unset.
  */
-ast::Expr make_assign(const ast::Assign_op op, ast::Expr target, ast::Expr value)
+[[nodiscard]] ast::Expr make_assign(const ast::Assign_op op, ast::Expr target, ast::Expr value)
 {
     return {.node = ast::Assign{
                     .op = op,
@@ -56,102 +148,19 @@ ast::Expr make_assign(const ast::Assign_op op, ast::Expr target, ast::Expr value
                     .value = std::make_unique<ast::Expr>(std::move(value)),
             }};
 }
-
-/**
- * @brief The assignment an operator spelling performs.
- * @param spelling The fused operator spelling.
- * @return The assignment, or std::nullopt when the spelling is not an assignment operator.
- */
-std::optional<ast::Assign_op> assign_operator_for(const std::string_view spelling)
-{
-    if (spelling == "=")
-    {
-        return ast::Assign_op::Assign;
-    }
-
-    if (spelling == "+=")
-    {
-        return ast::Assign_op::Add;
-    }
-
-    if (spelling == "-=")
-    {
-        return ast::Assign_op::Subtract;
-    }
-
-    if (spelling == "*=")
-    {
-        return ast::Assign_op::Multiply;
-    }
-
-    if (spelling == "/=")
-    {
-        return ast::Assign_op::Divide;
-    }
-
-    if (spelling == "%=")
-    {
-        return ast::Assign_op::Modulo;
-    }
-
-    if (spelling == "&=")
-    {
-        return ast::Assign_op::Bitwise_and;
-    }
-
-    if (spelling == "|=")
-    {
-        return ast::Assign_op::Bitwise_or;
-    }
-
-    if (spelling == "^=")
-    {
-        return ast::Assign_op::Bitwise_xor;
-    }
-
-    if (spelling == "<<=")
-    {
-        return ast::Assign_op::Shift_left;
-    }
-
-    if (spelling == ">>=")
-    {
-        return ast::Assign_op::Shift_right;
-    }
-
-    return std::nullopt;
-}
-
-/**
- * @brief The cast a keyword selects.
- * @param word The identifier's spelling.
- * @return The cast kind, or std::nullopt when the word is not one of the four cast keywords.
- */
-std::optional<ast::Cast_kind> cast_kind_for(const std::string_view word)
-{
-    if (word == "static_cast")
-    {
-        return ast::Cast_kind::Static;
-    }
-
-    if (word == "dynamic_cast")
-    {
-        return ast::Cast_kind::Dynamic;
-    }
-
-    if (word == "const_cast")
-    {
-        return ast::Cast_kind::Const;
-    }
-
-    if (word == "reinterpret_cast")
-    {
-        return ast::Cast_kind::Reinterpret;
-    }
-
-    return std::nullopt;
-}
 } // namespace
+
+ast::Expr Parser::parse_expression()
+{
+    auto expr{parse_assignment()};
+
+    if (more())
+    {
+        unexpected("end of input");
+    }
+
+    return expr;
+}
 
 ast::Expr Parser::parse_assignment()
 {
@@ -161,7 +170,7 @@ ast::Expr Parser::parse_assignment()
 
     const auto op{peek_operator()};
 
-    const auto assign{op ? assign_operator_for(op->spelling) : std::nullopt};
+    const auto assign{op ? lookup(assignments, op->spelling) : std::nullopt};
 
     if (!assign)
     {
@@ -170,6 +179,7 @@ ast::Expr Parser::parse_assignment()
 
     take_operator();
 
+    // Right-associative by recursing into this same level for the value.
     auto node{make_assign(*assign, std::move(expr), parse_assignment())};
 
     node.span = close(begin);
@@ -222,6 +232,7 @@ ast::Expr Parser::parse_binary(const int min_precedence)
 
         take_operator();
 
+        // The right operand may only bind tighter, which is what makes each level left-associative.
         expr = make_binary(info->op, std::move(expr), parse_binary(info->precedence + 1));
 
         expr.span = close(begin);
@@ -232,52 +243,16 @@ ast::Expr Parser::parse_unary()
 {
     const auto begin{here()};
 
-    const auto prefixed{[this, &begin](const ast::Unary_op op) {
-        auto expr{make_unary(op, parse_unary())};
-
-        expr.span = close(begin);
-
-        return expr;
-    }};
-
-    if (accept_operator("+"))
+    for (const auto& [spelling, op] : prefixes)
     {
-        return prefixed(ast::Unary_op::Plus);
-    }
+        if (accept_operator(spelling))
+        {
+            auto expr{make_unary(op, parse_unary())};
 
-    if (accept_operator("-"))
-    {
-        return prefixed(ast::Unary_op::Minus);
-    }
+            expr.span = close(begin);
 
-    if (accept_operator("!"))
-    {
-        return prefixed(ast::Unary_op::Not);
-    }
-
-    if (accept_operator("~"))
-    {
-        return prefixed(ast::Unary_op::Bitwise_not);
-    }
-
-    if (accept_operator("++"))
-    {
-        return prefixed(ast::Unary_op::Pre_increment);
-    }
-
-    if (accept_operator("--"))
-    {
-        return prefixed(ast::Unary_op::Pre_decrement);
-    }
-
-    if (accept_operator("&"))
-    {
-        return prefixed(ast::Unary_op::Address_of);
-    }
-
-    if (accept_operator("*"))
-    {
-        return prefixed(ast::Unary_op::Dereference);
+            return expr;
+        }
     }
 
     return parse_postfix();
@@ -293,116 +268,90 @@ ast::Expr Parser::parse_postfix()
     {
         if (accept_punctuation('('))
         {
-            std::vector<ast::Expr> arguments;
-
-            if (!check_punctuation(')'))
-            {
-                arguments.push_back(parse_assignment());
-
-                while (accept_punctuation(','))
-                {
-                    arguments.push_back(parse_assignment());
-                }
-            }
-
-            expect_punctuation(')', "')' to close the argument list");
-
-            expr = {.node = ast::Call{
-                            .callee = std::make_unique<ast::Expr>(std::move(expr)),
-                            .arguments = std::move(arguments),
-                    }};
-
-            expr.span = close(begin);
+            expr = parse_call(std::move(expr));
         }
         else if (accept_punctuation('['))
         {
-            auto index{parse_assignment()};
-
-            expect_punctuation(']', "']' to close the subscript");
-
-            expr = {.node = ast::Subscript{
-                            .object = std::make_unique<ast::Expr>(std::move(expr)),
-                            .index = std::make_unique<ast::Expr>(std::move(index)),
-                    }};
-
-            expr.span = close(begin);
+            expr = parse_subscript(std::move(expr));
         }
         else if (accept_punctuation('.'))
         {
-            const auto member{expect_identifier("a member name after '.'")};
-
-            expr = {.node = ast::Member{
-                            .op = ast::Member_op::Dot,
-                            .object = std::make_unique<ast::Expr>(std::move(expr)),
-                            .member = std::string{member.lexeme()},
-                    }};
-
-            expr.span = close(begin);
+            expr = parse_member(std::move(expr), ast::Member_op::Dot);
         }
         else if (accept_operator("->"))
         {
-            const auto member{expect_identifier("a member name after '->'")};
-
-            expr = {.node = ast::Member{
-                            .op = ast::Member_op::Arrow,
-                            .object = std::make_unique<ast::Expr>(std::move(expr)),
-                            .member = std::string{member.lexeme()},
-                    }};
-
-            expr.span = close(begin);
+            expr = parse_member(std::move(expr), ast::Member_op::Arrow);
         }
         else if (accept_operator("++"))
         {
-            expr = {.node = ast::Postfix{
-                            .op = ast::Postfix_op::Increment,
-                            .operand = std::make_unique<ast::Expr>(std::move(expr))}};
-
-            expr.span = close(begin);
+            expr = make_postfix(ast::Postfix_op::Increment, std::move(expr));
         }
         else if (accept_operator("--"))
         {
-            expr = {.node = ast::Postfix{
-                            .op = ast::Postfix_op::Decrement,
-                            .operand = std::make_unique<ast::Expr>(std::move(expr))}};
-
-            expr.span = close(begin);
+            expr = make_postfix(ast::Postfix_op::Decrement, std::move(expr));
         }
         else
         {
             return expr;
         }
+
+        expr.span = close(begin);
     }
+}
+
+ast::Expr Parser::parse_call(ast::Expr callee)
+{
+    std::vector<ast::Expr> arguments;
+
+    if (!check_punctuation(')'))
+    {
+        arguments.push_back(parse_assignment());
+
+        while (accept_punctuation(','))
+        {
+            arguments.push_back(parse_assignment());
+        }
+    }
+
+    expect_punctuation(')', "')' to close the argument list");
+
+    return {.node = ast::Call{
+                    .callee = std::make_unique<ast::Expr>(std::move(callee)),
+                    .arguments = std::move(arguments),
+            }};
+}
+
+ast::Expr Parser::parse_subscript(ast::Expr object)
+{
+    auto index{parse_assignment()};
+
+    expect_punctuation(']', "']' to close the subscript");
+
+    return {.node = ast::Subscript{
+                    .object = std::make_unique<ast::Expr>(std::move(object)),
+                    .index = std::make_unique<ast::Expr>(std::move(index)),
+            }};
+}
+
+ast::Expr Parser::parse_member(ast::Expr object, const ast::Member_op op)
+{
+    const auto member{
+            expect_identifier(op == ast::Member_op::Dot ? "a member name after '.'" : "a member name after '->'")};
+
+    return {.node = ast::Member{
+                    .op = op,
+                    .object = std::make_unique<ast::Expr>(std::move(object)),
+                    .member = std::string{member.lexeme()},
+            }};
 }
 
 ast::Expr Parser::parse_primary()
 {
     const auto begin{here()};
 
-    if (!pending_)
+    if (auto literal{parse_literal()})
     {
-        if (const auto token{accept(Token_kind::Number)})
-        {
-            const auto lexeme{token->lexeme()};
-
-            long long value{};
-
-            const auto [end, error]{std::from_chars(lexeme.data(), lexeme.data() + lexeme.size(), value)};
-
-            if (error != std::errc{} || end != lexeme.data() + lexeme.size())
-            {
-                syntax_error("Integer literal is out of range", *token);
-            }
-
-            return {.node = ast::Int_literal{.value = value}, .span = close(begin)};
-        }
-
-        if (const auto token{accept(Token_kind::String)})
-        {
-            const auto lexeme{token->lexeme()};
-
-            return {.node = ast::String_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}},
-                    .span = close(begin)};
-        }
+        return std::move(*literal);
     }
 
     if (accept_keyword("true"))
@@ -420,34 +369,9 @@ ast::Expr Parser::parse_primary()
         return {.node = ast::Name{.identifier = std::string{token->lexeme()}}, .span = close(begin)};
     }
 
-    if (!pending_)
+    if (auto cast{parse_cast()})
     {
-        if (const auto token{peek_token()}; token && token->kind() == Token_kind::Identifier)
-        {
-            if (const auto kind{cast_kind_for(token->lexeme())})
-            {
-                (void)next_token();
-
-                expect_operator("<", "'<' after the cast keyword");
-
-                auto type{parse_type_id()};
-
-                expect_operator(">", "'>' to close the cast type");
-                expect_punctuation('(', "'(' to open the cast operand");
-
-                auto operand{parse_assignment()};
-
-                expect_punctuation(')', "')' to close the cast operand");
-
-                return {.node =
-                                ast::Cast{
-                                        .kind = *kind,
-                                        .type = type,
-                                        .operand = std::make_unique<ast::Expr>(std::move(operand)),
-                                },
-                        .span = close(begin)};
-            }
-        }
+        return std::move(*cast);
     }
 
     if (accept_punctuation('('))
@@ -462,5 +386,75 @@ ast::Expr Parser::parse_primary()
     }
 
     unexpected("an expression");
+}
+
+std::optional<ast::Expr> Parser::parse_literal()
+{
+    if (pending_)
+    {
+        return std::nullopt;
+    }
+
+    const auto begin{here()};
+
+    if (const auto token{accept(Token_kind::Number)})
+    {
+        const auto value{integer_value(token->lexeme())};
+
+        if (!value)
+        {
+            syntax_error("Integer literal is out of range", *token);
+        }
+
+        return ast::Expr{.node = ast::Int_literal{.value = *value}, .span = close(begin)};
+    }
+
+    if (const auto token{accept(Token_kind::String)})
+    {
+        const auto lexeme{token->lexeme()};
+
+        // The quotes are the token's, not the value's, and the grammar admits no escapes to decode.
+        return ast::Expr{
+                .node = ast::String_literal{.value = std::string{lexeme.substr(1, lexeme.size() - 2)}},
+                .span = close(begin)};
+    }
+
+    return std::nullopt;
+}
+
+std::optional<ast::Expr> Parser::parse_cast()
+{
+    if (pending_)
+    {
+        return std::nullopt;
+    }
+
+    const auto token{peek_token()};
+
+    const auto kind{token && token->kind() == Token_kind::Identifier ? lookup(casts, token->lexeme()) : std::nullopt};
+
+    if (!kind)
+    {
+        return std::nullopt;
+    }
+
+    const auto begin{here()};
+
+    (void)next_token();
+
+    expect_operator("<", "'<' after the cast keyword");
+
+    const auto type{parse_type_id()};
+
+    expect_operator(">", "'>' to close the cast type");
+    expect_punctuation('(', "'(' to open the cast operand");
+
+    auto operand{parse_assignment()};
+
+    expect_punctuation(')', "')' to close the cast operand");
+
+    return ast::Expr{
+            .node = ast::Cast{.kind = *kind, .type = type, .operand = std::make_unique<ast::Expr>(std::move(operand))},
+            .span = close(begin)};
 }
 } // namespace hopper::clike

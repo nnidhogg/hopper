@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,43 +13,27 @@ namespace hopper::clike
 namespace
 {
 /**
+ * @brief The fundamental types and the keyword naming each.
+ */
+constexpr std::array<std::pair<std::string_view, ast::Type_kind>, 6> types{{
+        {"bool", ast::Type_kind::Bool},
+        {"char", ast::Type_kind::Char},
+        {"int", ast::Type_kind::Int},
+        {"float", ast::Type_kind::Float},
+        {"double", ast::Type_kind::Double},
+        {"void", ast::Type_kind::Void},
+}};
+
+/**
  * @brief The fundamental type a keyword names.
  * @param word The identifier's spelling.
  * @return The type kind, or std::nullopt when the word names no type.
  */
-std::optional<ast::Type_kind> type_kind_for(const std::string_view word)
+[[nodiscard]] std::optional<ast::Type_kind> type_kind_for(const std::string_view word)
 {
-    if (word == "bool")
-    {
-        return ast::Type_kind::Bool;
-    }
+    const auto found{std::ranges::find(types, word, &std::pair<std::string_view, ast::Type_kind>::first)};
 
-    if (word == "char")
-    {
-        return ast::Type_kind::Char;
-    }
-
-    if (word == "int")
-    {
-        return ast::Type_kind::Int;
-    }
-
-    if (word == "float")
-    {
-        return ast::Type_kind::Float;
-    }
-
-    if (word == "double")
-    {
-        return ast::Type_kind::Double;
-    }
-
-    if (word == "void")
-    {
-        return ast::Type_kind::Void;
-    }
-
-    return std::nullopt;
+    return found != types.end() ? std::optional{found->second} : std::nullopt;
 }
 } // namespace
 
@@ -126,19 +112,12 @@ ast::Type_id Parser::parse_type_id()
 {
     const auto type{parse_type_specifier()};
 
-    std::size_t pointers{0};
-
-    while (accept_operator("*"))
-    {
-        ++pointers;
-    }
-
-    const bool reference{accept_operator("&")};
+    const auto [pointers, reference]{parse_indirection()};
 
     return {.type = type, .pointers = pointers, .reference = reference};
 }
 
-ast::Declarator Parser::parse_declarator()
+Parser::Indirection Parser::parse_indirection()
 {
     std::size_t pointers{0};
 
@@ -147,20 +126,28 @@ ast::Declarator Parser::parse_declarator()
         ++pointers;
     }
 
-    const auto reference{accept_operator("&")};
+    return {.pointers = pointers, .reference = accept_operator("&")};
+}
+
+ast::Declarator Parser::parse_declarator()
+{
+    const auto [pointers, reference]{parse_indirection()};
 
     const auto name{expect_identifier("a declarator name")};
-
-    std::optional<ast::Expr> initializer;
-
-    if (accept_operator("="))
-    {
-        initializer = parse_assignment();
-    }
 
     return {.pointers = pointers,
             .reference = reference,
             .name = std::string{name.lexeme()},
-            .initializer = std::move(initializer)};
+            .initializer = parse_initializer()};
+}
+
+std::optional<ast::Expr> Parser::parse_initializer()
+{
+    if (!accept_operator("="))
+    {
+        return std::nullopt;
+    }
+
+    return parse_assignment();
 }
 } // namespace hopper::clike

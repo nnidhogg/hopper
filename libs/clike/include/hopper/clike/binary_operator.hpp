@@ -13,7 +13,14 @@ namespace hopper::clike
  */
 struct Binary_operator
 {
+    /**
+     * @brief The rung on the ladder, one for the loosest binding operator upward.
+     */
     int precedence;
+
+    /**
+     * @brief The node the operator builds.
+     */
     ast::Binary_op op;
 };
 

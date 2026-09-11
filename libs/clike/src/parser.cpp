@@ -261,16 +261,4 @@ void Parser::unexpected(const std::string_view what)
 
     syntax_error("Expected " + std::string(what), *token);
 }
-
-ast::Expr Parser::parse_expression()
-{
-    auto expr{parse_assignment()};
-
-    if (more())
-    {
-        unexpected("end of input");
-    }
-
-    return expr;
-}
 } // namespace hopper::clike

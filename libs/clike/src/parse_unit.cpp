@@ -26,38 +26,24 @@ ast::Translation_unit Parser::parse_translation_unit()
 
 ast::Translation_unit::Item::Node_t Parser::parse_external_declaration()
 {
-    auto type{parse_type_specifier()};
+    const auto type{parse_type_specifier()};
 
-    std::size_t pointers{0};
-
-    while (accept_operator("*"))
-    {
-        ++pointers;
-    }
-
-    const auto reference{accept_operator("&")};
+    const auto indirection{parse_indirection()};
 
     const auto name{expect_identifier("a declarator name")};
 
     if (check_punctuation('('))
     {
-        return parse_function(type, pointers, reference, std::string{name.lexeme()});
-    }
-
-    std::optional<ast::Expr> initializer;
-
-    if (accept_operator("="))
-    {
-        initializer = parse_assignment();
+        return parse_function(type, indirection, std::string{name.lexeme()});
     }
 
     std::vector<ast::Declarator> declarators;
 
     declarators.push_back(
-            {.pointers = pointers,
-             .reference = reference,
+            {.pointers = indirection.pointers,
+             .reference = indirection.reference,
              .name = std::string{name.lexeme()},
-             .initializer = std::move(initializer)});
+             .initializer = parse_initializer()});
 
     while (accept_punctuation(','))
     {
@@ -69,8 +55,7 @@ ast::Translation_unit::Item::Node_t Parser::parse_external_declaration()
     return ast::Declaration{.type = type, .declarators = std::move(declarators)};
 }
 
-ast::Function Parser::parse_function(
-        const ast::Type type, const std::size_t pointers, const bool reference, std::string name)
+ast::Function Parser::parse_function(const ast::Type type, const Indirection indirection, std::string name)
 {
     expect_punctuation('(', "'(' to open the parameter list");
 
@@ -88,38 +73,27 @@ ast::Function Parser::parse_function(
 
     expect_punctuation(')', "')' to close the parameter list");
 
-    if (accept_punctuation(';'))
+    // A prototype ends here; a definition carries its body, and nothing else tells the two apart.
+    std::unique_ptr<ast::Stmt> body;
+
+    if (!accept_punctuation(';'))
     {
-        return {.return_type = type,
-                .pointers = pointers,
-                .reference = reference,
-                .name = std::move(name),
-                .parameters = std::move(parameters),
-                .body = nullptr};
+        body = std::make_unique<ast::Stmt>(parse_compound_statement());
     }
 
-    auto body{parse_compound_statement()};
-
     return {.return_type = type,
-            .pointers = pointers,
-            .reference = reference,
+            .pointers = indirection.pointers,
+            .reference = indirection.reference,
             .name = std::move(name),
             .parameters = std::move(parameters),
-            .body = std::make_unique<ast::Stmt>(std::move(body))};
+            .body = std::move(body)};
 }
 
 ast::Parameter Parser::parse_parameter()
 {
-    auto type{parse_type_specifier()};
+    const auto type{parse_type_specifier()};
 
-    std::size_t pointers{0};
-
-    while (accept_operator("*"))
-    {
-        ++pointers;
-    }
-
-    const auto reference{accept_operator("&")};
+    const auto [pointers, reference]{parse_indirection()};
 
     std::string name;
 
@@ -128,17 +102,10 @@ ast::Parameter Parser::parse_parameter()
         name = std::string{token->lexeme()};
     }
 
-    std::optional<ast::Expr> default_value;
-
-    if (accept_operator("="))
-    {
-        default_value = parse_assignment();
-    }
-
     return {.type = type,
             .pointers = pointers,
             .reference = reference,
             .name = std::move(name),
-            .default_value = std::move(default_value)};
+            .default_value = parse_initializer()};
 }
 } // namespace hopper::clike
