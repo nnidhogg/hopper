@@ -61,10 +61,13 @@ start whose evidence the change left untouched, because the certificate promises
 tokenizable text agreeing on that evidence, the edited one included; and it may stop at the first boundary after the
 change that the old segmentation also had, because from a shared boundary two scans of the same suffix agree.
 `hopper::json::Document` is that theorem as a type. It keeps a text and its token stream, whitespace included, and
-`edit()` replaces a byte range, rescans between those two positions and reports how many bytes it read. The certificate
-carries nothing for a text that does not tokenize completely, so an edit that breaks tokenization relexes the whole
-text, and so does every edit through the one that repairs it. A document is a stream and not a tree: what a parser
-may keep of its result across an edit is the resumption question below, not something the document answers.
+`edit()` replaces a byte range, searches backward within a budget of 4,096 bytes for a certified start whose evidence
+the edit left untouched, rescans from there to the first shared boundary past the edit and reports how many bytes it
+read. Where no certified start lies within the budget, as inside one long string, the document relexes the whole text;
+the certificate carries nothing for a text that does not tokenize completely, so an edit that breaks tokenization
+relexes the whole text too, and so does every edit through the one that repairs it. A document is a stream and not a
+tree: what a parser may keep of its result across an edit is the resumption question below, not something the document
+answers.
 
 The saving is measured rather than assumed. `tools/probes/hopper_edit_relex` applies a fixed schedule of edits that keep
 the text tokenizable, a digit changed at the end of a number, letters inserted or one deleted inside a string, a line
