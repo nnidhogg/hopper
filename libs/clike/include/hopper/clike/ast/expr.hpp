@@ -1,6 +1,7 @@
 #ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP
 #define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <variant>
@@ -16,7 +17,7 @@ struct Expr;
 /**
  * @brief A prefix operator applied to a single operand.
  */
-enum class Unary_op
+enum class Unary_op : std::uint8_t
 {
     Plus,
     Minus,
@@ -31,7 +32,7 @@ enum class Unary_op
 /**
  * @brief An infix operator applied to two operands.
  */
-enum class Binary_op
+enum class Binary_op : std::uint8_t
 {
     Add,
     Subtract,
@@ -56,7 +57,7 @@ enum class Binary_op
 /**
  * @brief A postfix operator applied to a single operand: `x++` or `x--`.
  */
-enum class Postfix_op
+enum class Postfix_op : std::uint8_t
 {
     Increment,
     Decrement,
@@ -65,7 +66,7 @@ enum class Postfix_op
 /**
  * @brief How a member is accessed: `object.member` or `object->member`.
  */
-enum class Member_op
+enum class Member_op : std::uint8_t
 {
     Dot,
     Arrow,
@@ -74,7 +75,7 @@ enum class Member_op
 /**
  * @brief An assignment operator: plain `=`, or a compound assignment combining it with a binary operator.
  */
-enum class Assign_op
+enum class Assign_op : std::uint8_t
 {
     Assign,
     Add,
@@ -223,7 +224,7 @@ struct Subscript
 /**
  * @brief The four named casts.
  */
-enum class Cast_kind
+enum class Cast_kind : std::uint8_t
 {
     Static,
     Dynamic,
@@ -353,6 +354,7 @@ struct Expr
      */
     parse::Source_span span{};
 };
+
 } // namespace hopper::clike::ast
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP

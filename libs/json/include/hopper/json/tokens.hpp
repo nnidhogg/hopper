@@ -1,7 +1,7 @@
 #ifndef HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_TOKENS_HPP
 #define HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_TOKENS_HPP
 
-#include <cstddef>
+#include <cstdint>
 
 #include <munch/core/lexer.hpp>
 
@@ -13,7 +13,7 @@ namespace hopper::json
  * Whitespace is a token the reader discards; every other kind reaches the parser. The three literals and the six
  * structural characters are separate kinds so the parser dispatches on the kind alone, never on the lexeme.
  */
-enum class Token_kind : std::size_t
+enum class Token_kind : std::uint8_t
 {
     String,
     Number,
@@ -52,6 +52,7 @@ enum class Token_kind : std::size_t
  * @return The compiled lexer.
  */
 [[nodiscard]] munch::core::Lexer lexer();
+
 } // namespace hopper::json
 
 #endif // HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_TOKENS_HPP

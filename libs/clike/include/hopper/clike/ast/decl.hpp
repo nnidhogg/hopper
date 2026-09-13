@@ -59,6 +59,7 @@ struct Declaration
      */
     std::vector<Declarator> declarators;
 };
+
 } // namespace hopper::clike::ast
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_DECL_HPP

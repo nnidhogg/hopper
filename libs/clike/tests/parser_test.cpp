@@ -582,6 +582,7 @@ private:
 
     const char* identifiers_[4]{"alpha", "beta", "gamma", "delta"};
 };
+
 } // namespace
 
 TEST(Parser_test, Integer_literal)

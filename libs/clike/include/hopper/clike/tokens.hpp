@@ -1,7 +1,7 @@
 #ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_TOKENS_HPP
 #define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_TOKENS_HPP
 
-#include <cstddef>
+#include <cstdint>
 
 #include <munch/core/lexer.hpp>
 
@@ -16,7 +16,7 @@ namespace hopper::clike
  * punctuation byte, a string, a line comment and a whitespace run. Keywords are identifiers here and multi-byte
  * operators are runs of operator bytes; both are the parser's to recognize.
  */
-enum class Token_kind : std::size_t
+enum class Token_kind : std::uint8_t
 {
     Identifier,
     Number,
@@ -48,6 +48,7 @@ enum class Token_kind : std::size_t
  * @return The compiled lexer.
  */
 [[nodiscard]] munch::core::Lexer lexer();
+
 } // namespace hopper::clike
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_TOKENS_HPP

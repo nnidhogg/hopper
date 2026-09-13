@@ -108,4 +108,5 @@ ast::Parameter Parser::parse_parameter()
             .name = std::move(name),
             .default_value = parse_initializer()};
 }
+
 } // namespace hopper::clike

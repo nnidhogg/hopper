@@ -35,6 +35,7 @@
 namespace
 {
 using hopper::json::Document;
+using hopper::json::Piece;
 using hopper::json::Token_kind;
 
 std::size_t failures{0}; ///< Expectations that did not hold, which decide the exit status.
@@ -44,7 +45,7 @@ std::size_t failures{0}; ///< Expectations that did not hold, which decide the e
  * @param condition Whether it held.
  * @param what What was expected, printed when it did not.
  */
-void expect(const bool condition, const char* what)
+void expect(const bool condition, const std::string_view what)
 {
     if (!condition)
     {
@@ -119,7 +120,7 @@ struct Edit
  * @param token The token.
  * @return True when the token is a string without a backslash.
  */
-bool plain_string(const std::string& text, const Document::Token& token)
+bool plain_string(const std::string& text, const Piece& token)
 {
     return token.kind == Token_kind::String &&
            std::string_view{text}.substr(token.offset, token.length).find('\\') == std::string_view::npos;
@@ -142,7 +143,7 @@ bool ascii(const char byte)
  * @param step The schedule step, which chooses the edit's kind and its position within the token.
  * @return The edit, or std::nullopt when the token does not suit the step.
  */
-std::optional<Edit> edit_for(const std::string& text, const Document::Token& token, const int step)
+std::optional<Edit> edit_for(const std::string& text, const Piece& token, const int step)
 {
     switch (step % 4)
     {

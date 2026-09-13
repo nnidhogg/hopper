@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -37,17 +38,17 @@ public:
     using Result_t = munch::tools::tokenizer::Tokenizer::Result_t<Kind>;
 
     /**
-     * @brief Predicate selecting the token kinds the stream discards; nullptr discards nothing.
+     * @brief Predicate selecting the token kinds the stream discards; an empty one discards nothing.
      */
-    using Skip_t = bool (*)(Kind);
+    using Skip_t = std::function<bool(Kind)>;
 
     /**
      * @brief Construct a token stream from a lexer.
      * @param lexer Lexer used to recognize tokens.
      * @param skip Predicate selecting the token kinds to discard.
      */
-    explicit Token_reader(munch::core::Lexer lexer, const Skip_t skip = nullptr)
-        : tokenizer_{std::move(lexer)}, skip_{skip}
+    explicit Token_reader(munch::core::Lexer lexer, Skip_t skip = {})
+        : tokenizer_{std::move(lexer)}, skip_{std::move(skip)}
     {}
 
     /**
@@ -56,8 +57,8 @@ public:
      * @param input Input text to tokenize.
      * @param skip Predicate selecting the token kinds to discard.
      */
-    explicit Token_reader(munch::core::Lexer lexer, const std::string& input, const Skip_t skip = nullptr)
-        : tokenizer_{std::move(lexer), input}, skip_{skip}
+    explicit Token_reader(munch::core::Lexer lexer, const std::string& input, Skip_t skip = {})
+        : tokenizer_{std::move(lexer), input}, skip_{std::move(skip)}
     {}
 
     /**
@@ -66,8 +67,8 @@ public:
      * @param file Path to the file whose contents will be tokenized.
      * @param skip Predicate selecting the token kinds to discard.
      */
-    explicit Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file, const Skip_t skip = nullptr)
-        : tokenizer_{std::move(lexer), read(file)}, skip_{skip}
+    explicit Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file, Skip_t skip = {})
+        : tokenizer_{std::move(lexer), read(file)}, skip_{std::move(skip)}
     {}
 
     /**

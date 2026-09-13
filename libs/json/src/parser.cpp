@@ -1,8 +1,12 @@
 #include "hopper/json/parser.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "hopper/parse/parse_error.hpp"
@@ -11,6 +15,16 @@ namespace hopper::json
 {
 namespace
 {
+/**
+ * @brief The first code point above the basic plane, where a surrogate pair's arithmetic begins.
+ */
+constexpr std::uint32_t supplementary_base{0x10000};
+
+/**
+ * @brief The six bytes a second \u escape occupies: a backslash, a u and four digits.
+ */
+constexpr std::size_t escape_width{6};
+
 /**
  * @brief The numeric value of one hex digit, already known to be one.
  * @param digit The digit character.
@@ -92,7 +106,7 @@ void append_utf8(std::string& out, const std::uint32_t code_point)
         out.push_back(static_cast<char>(0xC0 | (code_point >> 6)));
         out.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
     }
-    else if (code_point < 0x10000)
+    else if (code_point < supplementary_base)
     {
         out.push_back(static_cast<char>(0xE0 | (code_point >> 12)));
         out.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
@@ -161,9 +175,8 @@ std::size_t append_unicode_escape(
         return last;
     }
 
-    // The second escape must be there in full, so the pair needs six more bytes: a backslash, a u, and four digits.
     const bool paired{
-            last + 6 < text.size() && text[last + 1] == '\\' && text[last + 2] == 'u' &&
+            last + escape_width < text.size() && text[last + 1] == '\\' && text[last + 2] == 'u' &&
             is_low_surrogate(code_unit_at(text, last + 3))};
 
     if (!paired)
@@ -175,9 +188,9 @@ std::size_t append_unicode_escape(
 
     const auto low{code_unit_at(text, last + 3)};
 
-    append_utf8(out, 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
+    append_utf8(out, supplementary_base + ((unit - 0xD800) << 10) + (low - 0xDC00));
 
-    return last + 6;
+    return last + escape_width;
 }
 
 } // namespace
@@ -193,32 +206,32 @@ Parser::Parser(const std::filesystem::path& file) : Parser{Token_reader_t{lexer(
 
 Value Parser::parse()
 {
-    std::vector<Frame> stack;
+    std::vector<Frame> open;
 
-    std::optional<Value> completed;
+    std::optional<Value> done;
 
-    // The two phases alternate: a value is due, or a value is in hand and belongs somewhere. Which one holds is
-    // exactly whether completed carries anything, so the stack and this optional are the parser's whole state.
+    // Two phases alternate: a value is due, or a value is in hand and belongs somewhere. Which one holds is exactly
+    // whether done carries anything, so the stack and this optional are the parser's whole state.
     while (true)
     {
-        if (!completed)
+        if (!done)
         {
-            completed = open_value(stack);
+            done = begin_value(open);
 
             continue;
         }
 
-        if (stack.empty())
+        if (open.empty())
         {
             if (const auto trailing{peek_token()})
             {
                 syntax_error("Expected end of input after the value", *trailing);
             }
 
-            return std::move(*completed);
+            return std::move(*done);
         }
 
-        completed = close_value(stack, std::move(*completed));
+        done = place(open, std::move(*done));
     }
 }
 
@@ -262,7 +275,7 @@ Parser::Token_t Parser::next_or_end(const std::string_view what)
 
     if (!token)
     {
-        eof_error("Expected " + std::string(what) + " before end of input");
+        eof_error("Expected " + std::string{what} + " before end of input");
     }
 
     return *token;
@@ -285,7 +298,7 @@ Value Parser::scalar(const Token_t& token, const parse::Source_span& span)
     }
 }
 
-std::string Parser::read_member_name()
+std::string Parser::member_name()
 {
     const auto begin{mark()};
 
@@ -298,23 +311,7 @@ std::string Parser::read_member_name()
     return text;
 }
 
-std::optional<Value> Parser::close_if_empty(std::vector<Frame>& stack, const Token_kind closer)
-{
-    if (!accept(closer))
-    {
-        return std::nullopt;
-    }
-
-    auto container{std::move(stack.back().container)};
-
-    container.span = span_from(stack.back().begin);
-
-    stack.pop_back();
-
-    return container;
-}
-
-std::optional<Value> Parser::open_value(std::vector<Frame>& stack)
+std::optional<Value> Parser::begin_value(std::vector<Frame>& open)
 {
     const auto begin{mark()};
 
@@ -323,43 +320,48 @@ std::optional<Value> Parser::open_value(std::vector<Frame>& stack)
     switch (token.kind())
     {
     case Token_kind::Left_bracket:
-        stack.push_back({.container = Value{Array{}, {}}, .name = {}, .begin = begin});
+        open.push_back({.container = Value{Array{}, {}}, .name = {}, .begin = begin});
 
-        return close_if_empty(stack, Token_kind::Right_bracket);
+        if (accept(Token_kind::Right_bracket))
+        {
+            return close(open);
+        }
+
+        return std::nullopt;
 
     case Token_kind::Left_brace:
-    {
-        stack.push_back({.container = Value{Object{}, {}}, .name = {}, .begin = begin});
+        open.push_back({.container = Value{Object{}, {}}, .name = {}, .begin = begin});
 
-        auto empty{close_if_empty(stack, Token_kind::Right_brace)};
+        if (accept(Token_kind::Right_brace))
+        {
+            return close(open);
+        }
 
         // A non-empty object states its first name before its first value, so the frame takes it now; an array has
         // nothing to read here, which is the only difference between the two cases.
-        if (!empty)
-        {
-            stack.back().name = read_member_name();
-        }
+        open.back().name = member_name();
 
-        return empty;
-    }
+        return std::nullopt;
+
     case Token_kind::String:
     case Token_kind::Number:
     case Token_kind::True:
     case Token_kind::False:
     case Token_kind::Null:
         return scalar(token, span_from(begin));
+
     default:
         syntax_error("Expected a value", token);
     }
 }
 
-std::optional<Value> Parser::close_value(std::vector<Frame>& stack, Value completed)
+std::optional<Value> Parser::place(std::vector<Frame>& open, Value value)
 {
-    auto& top{stack.back()};
+    auto& top{open.back()};
 
-    if (auto* const array{std::get_if<Array>(&top.container.node)})
+    if (std::holds_alternative<Array>(top.container.node))
     {
-        array->elements.push_back(std::move(completed));
+        std::get<Array>(top.container.node).elements.push_back(std::move(value));
 
         const auto token{next_or_end("',' or ']'")};
 
@@ -376,15 +378,14 @@ std::optional<Value> Parser::close_value(std::vector<Frame>& stack, Value comple
     else
     {
         // Only arrays and objects are ever pushed, so the frame that is not an array is an object.
-        auto& object{std::get<Object>(top.container.node)};
-
-        object.members.push_back({.name = std::move(top.name), .value = std::move(completed)});
+        std::get<Object>(top.container.node)
+                .members.push_back({.name = std::move(top.name), .value = std::move(value)});
 
         const auto token{next_or_end("',' or '}'")};
 
         if (token.kind() == Token_kind::Comma)
         {
-            top.name = read_member_name();
+            top.name = member_name();
 
             return std::nullopt;
         }
@@ -395,11 +396,16 @@ std::optional<Value> Parser::close_value(std::vector<Frame>& stack, Value comple
         }
     }
 
-    auto container{std::move(top.container)};
+    return close(open);
+}
 
-    container.span = span_from(top.begin);
+Value Parser::close(std::vector<Frame>& open)
+{
+    auto container{std::move(open.back().container)};
 
-    stack.pop_back();
+    container.span = span_from(open.back().begin);
+
+    open.pop_back();
 
     return container;
 }

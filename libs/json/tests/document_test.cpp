@@ -9,11 +9,12 @@
 namespace
 {
 using hopper::json::Document;
+using hopper::json::Piece;
 
 /**
  * @brief The token stream of a text tokenized whole, the reference every edit is held to.
  */
-std::vector<Document::Token> whole(const std::string& text)
+std::vector<Piece> whole(const std::string& text)
 {
     return Document{text}.tokens();
 }

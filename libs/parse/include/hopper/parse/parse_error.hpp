@@ -1,6 +1,7 @@
 #ifndef HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSE_ERROR_HPP
 #define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSE_ERROR_HPP
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 
@@ -12,7 +13,7 @@ namespace hopper::parse
  * @brief What went wrong: the input failed to tokenize, a token was not the expected one, the input ended, or a
  *        token the grammar admits spells a value the language rejects, such as a lone surrogate escape.
  */
-enum class Parse_error_kind
+enum class Parse_error_kind : std::uint8_t
 {
     Lexical,
     Unexpected_token,

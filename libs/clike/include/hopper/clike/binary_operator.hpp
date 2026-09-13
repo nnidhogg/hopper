@@ -43,6 +43,7 @@ struct Binary_operator
  * @return True when some operator starts with it.
  */
 [[nodiscard]] bool is_operator_prefix(std::string_view spelling) noexcept;
+
 } // namespace hopper::clike
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_BINARY_OPERATOR_HPP

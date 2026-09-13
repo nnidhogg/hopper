@@ -2,13 +2,14 @@
 #define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_TYPE_HPP
 
 #include <cstddef>
+#include <cstdint>
 
 namespace hopper::clike::ast
 {
 /**
  * @brief A fundamental type name.
  */
-enum class Type_kind
+enum class Type_kind : std::uint8_t
 {
     Bool,
     Char,
@@ -58,6 +59,7 @@ struct Type_id
      */
     bool reference;
 };
+
 } // namespace hopper::clike::ast
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_TYPE_HPP

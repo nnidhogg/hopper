@@ -450,6 +450,7 @@ private:
      */
     std::optional<Operator> pending_;
 };
+
 } // namespace hopper::clike
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_PARSER_HPP

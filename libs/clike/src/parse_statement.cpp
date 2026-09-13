@@ -247,4 +247,5 @@ ast::Stmt Parser::parse_expression_statement(const std::string_view what)
 
     return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(begin)};
 }
+
 } // namespace hopper::clike

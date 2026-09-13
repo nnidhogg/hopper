@@ -35,6 +35,7 @@ constexpr std::array<std::pair<std::string_view, ast::Type_kind>, 6> types{{
 
     return found != types.end() ? std::optional{found->second} : std::nullopt;
 }
+
 } // namespace
 
 bool Parser::is_declaration_start()
@@ -150,4 +151,5 @@ std::optional<ast::Expr> Parser::parse_initializer()
 
     return parse_assignment();
 }
+
 } // namespace hopper::clike

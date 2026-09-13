@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <gtest/gtest.h>
+#include <stdexcept>
 #include <string>
 
 #include "hopper/json/value.hpp"
@@ -106,14 +107,16 @@ TEST(Json, Containers_keep_document_order_and_duplicates)
     EXPECT_EQ(object.members[0].name, "a");
     EXPECT_EQ(object.members[1].name, "a");
     EXPECT_EQ(object.members[2].name, "c");
-    EXPECT_TRUE(object.find("a")->as_bool());
-    EXPECT_EQ(object.find("missing"), nullptr);
+    EXPECT_EQ(object.find("a"), 1U);
+    EXPECT_TRUE(object.at("a").as_bool());
+    EXPECT_FALSE(object.find("missing").has_value());
+    EXPECT_THROW((void)object.at("missing"), std::out_of_range);
 
     const auto& array{object.members[0].value.as_array()};
 
     ASSERT_EQ(array.elements.size(), 3U);
     EXPECT_EQ(array.elements[1].as_number().text, "2");
-    EXPECT_TRUE(array.elements[2].as_object().find("b")->is_null());
+    EXPECT_TRUE(array.elements[2].as_object().at("b").is_null());
     EXPECT_TRUE(object.members[2].value.as_object().members.empty());
 }
 

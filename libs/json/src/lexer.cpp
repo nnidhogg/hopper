@@ -47,4 +47,5 @@ munch::core::Lexer lexer()
 
     return builder.build();
 }
+
 } // namespace hopper::json

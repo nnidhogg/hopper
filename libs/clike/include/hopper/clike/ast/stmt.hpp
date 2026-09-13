@@ -165,6 +165,7 @@ struct Stmt
      */
     parse::Source_span span{};
 };
+
 } // namespace hopper::clike::ast
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_STMT_HPP

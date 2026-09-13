@@ -148,6 +148,7 @@ template <typename Table>
                     .value = std::make_unique<ast::Expr>(std::move(value)),
             }};
 }
+
 } // namespace
 
 ast::Expr Parser::parse_expression()
@@ -457,4 +458,5 @@ std::optional<ast::Expr> Parser::parse_cast()
             .node = ast::Cast{.kind = *kind, .type = type, .operand = std::make_unique<ast::Expr>(std::move(operand))},
             .span = close(begin)};
 }
+
 } // namespace hopper::clike

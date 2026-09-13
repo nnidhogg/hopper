@@ -2,6 +2,7 @@
 #define HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_VALUE_HPP
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -11,8 +12,8 @@
 
 namespace hopper::json
 {
-struct Value;
 struct Member;
+struct Value;
 
 /**
  * @brief The JSON null.
@@ -41,7 +42,7 @@ struct Number
 
     /**
      * @brief The nearest double to the spelled value.
-     * @return The converted value; an exponent past the double range gives an infinity.
+     * @return The converted value; a magnitude past the double range gives an infinity, one under it a zero.
      */
     [[nodiscard]] double to_double() const;
 
@@ -73,7 +74,7 @@ struct Array
  * @brief A JSON object: its members in document order, duplicates kept.
  *
  * RFC 8259 asks for unique names without requiring them, so the tree keeps what the document says and lets the
- * caller decide; find() answers as most processors do, with the last member of that name.
+ * caller decide; the lookups answer as most processors do, with the last member of that name.
  */
 struct Object
 {
@@ -85,9 +86,17 @@ struct Object
     /**
      * @brief Finds the last member carrying a name.
      * @param name The member name, as characters, escapes already resolved.
-     * @return The member's value, or nullptr when no member carries the name.
+     * @return The member's index in members, or std::nullopt when no member carries the name.
      */
-    [[nodiscard]] const Value* find(std::string_view name) const noexcept;
+    [[nodiscard]] std::optional<std::size_t> find(std::string_view name) const noexcept;
+
+    /**
+     * @brief The value of the last member carrying a name.
+     * @param name The member name, as characters, escapes already resolved.
+     * @return The member's value.
+     * @throws std::out_of_range If no member carries the name.
+     */
+    [[nodiscard]] const Value& at(std::string_view name) const;
 
     /**
      * @brief Two objects are equal when their member lists are, in order.
@@ -136,7 +145,7 @@ struct Value
      * @brief Destroys the value and everything under it without recursing.
      *
      * A tree is as deep as its document nested it, and the parser builds one without touching the call stack, so the
-     * destructor does the same: it moves the children out into a worklist and destroys them level by level.
+     * destructor does the same: it moves the children out onto a worklist and destroys them level by level.
      */
     ~Value();
 
@@ -212,6 +221,7 @@ struct Member
      */
     [[nodiscard]] bool operator==(const Member&) const = default;
 };
+
 } // namespace hopper::json
 
 #endif // HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_VALUE_HPP

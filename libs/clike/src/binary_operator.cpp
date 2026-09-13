@@ -41,6 +41,7 @@ constexpr std::array<std::pair<std::string_view, Binary_operator>, 18> ladder{{
 constexpr std::array<std::string_view, 34> operators{
         "+",  "-",  "*",  "/",  "%",  "<",  ">",  "=",  "!",  "&",  "|",  "^",  "~",  "++", "--", "==",  "!=",
         "<=", ">=", "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "->", "<<=", ">>="};
+
 } // namespace
 
 std::optional<Binary_operator> binary_operator_for(const std::string_view spelling)
@@ -55,4 +56,5 @@ bool is_operator_prefix(const std::string_view spelling) noexcept
     return std::ranges::any_of(
             operators, [spelling](const std::string_view candidate) { return candidate.starts_with(spelling); });
 }
+
 } // namespace hopper::clike

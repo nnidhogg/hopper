@@ -127,6 +127,7 @@ struct Translation_unit
      */
     std::vector<Item> items;
 };
+
 } // namespace hopper::clike::ast
 
 #endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_UNIT_HPP

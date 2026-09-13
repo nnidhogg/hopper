@@ -50,6 +50,7 @@ bool is_keyword(const std::string_view spelling) noexcept
 
     return false;
 }
+
 } // namespace
 
 Parser::Parser(Token_reader_t reader) : Parser_base{std::move(reader)}
@@ -261,4 +262,5 @@ void Parser::unexpected(const std::string_view what)
 
     syntax_error("Expected " + std::string(what), *token);
 }
+
 } // namespace hopper::clike

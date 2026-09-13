@@ -12,6 +12,7 @@
 #include "hopper/json/tokens.hpp"
 #include "hopper/json/value.hpp"
 #include "hopper/parse/parser_base.hpp"
+#include "hopper/parse/source_span.hpp"
 #include "hopper/parse/token_reader.hpp"
 
 namespace hopper::json
@@ -121,28 +122,18 @@ private:
      * so it is stated once; the colon is consumed here because a name without one is not a member.
      * @return The name's characters, escapes resolved.
      */
-    [[nodiscard]] std::string read_member_name();
+    [[nodiscard]] std::string member_name();
 
     /**
-     * @brief Closes the container just opened if the very next token ends it.
+     * @brief Reads the value that is due.
      *
-     * An empty container is the one case where opening and closing happen without a value in between, and both
-     * array and object need it, so neither case has to special-case its own emptiness.
-     * @param stack The parser's stack, whose top frame was just pushed.
-     * @param closer The bracket that would end this container.
-     * @return The finished empty container, or nothing when the container has contents.
-     */
-    [[nodiscard]] std::optional<Value> close_if_empty(std::vector<Frame>& stack, Token_kind closer);
-
-    /**
-     * @brief Reads the value that is due, opening a frame when it is a container.
-     *
-     * A scalar is complete the moment it is read; a container is not, so it becomes a frame and the next value due
-     * is its first element or member. Returning nothing is how that difference is reported.
-     * @param stack The parser's stack, pushed to when the value opens a container.
+     * A scalar is complete the moment it is read and is returned; a container opens a frame instead, and the next
+     * value due is its first element or member, unless the container closes at once, in which case the empty
+     * container is what was read. Returning nothing is how an open frame is reported.
+     * @param open The parser's stack, pushed to when the value opens a container.
      * @return The completed value, or nothing when a container opened and its contents are still to come.
      */
-    [[nodiscard]] std::optional<Value> open_value(std::vector<Frame>& stack);
+    [[nodiscard]] std::optional<Value> begin_value(std::vector<Frame>& open);
 
     /**
      * @brief Puts a completed value into the container on top of the stack and reads the separator after it.
@@ -150,12 +141,20 @@ private:
      * The separator decides what happens next, so it is read here rather than by the caller: a comma means another
      * value is due and the frame stays open, and the closing bracket finishes the container, which then becomes the
      * completed value for whatever frame lies beneath it.
-     * @param stack The parser's stack, whose top frame receives the value.
-     * @param completed The value to put into it.
+     * @param open The parser's stack, whose top frame receives the value.
+     * @param value The value to put into it.
      * @return The finished container when it closed, or nothing when more elements or members follow.
      */
-    [[nodiscard]] std::optional<Value> close_value(std::vector<Frame>& stack, Value completed);
+    [[nodiscard]] std::optional<Value> place(std::vector<Frame>& open, Value value);
+
+    /**
+     * @brief Pops the top frame and returns its container with the span closed at the reader's position.
+     * @param open The parser's stack, whose top frame's closing bracket was just consumed.
+     * @return The finished container.
+     */
+    [[nodiscard]] Value close(std::vector<Frame>& open);
 };
+
 } // namespace hopper::json
 
 #endif // HOPPER_LIBS_JSON_INCLUDE_HOPPER_JSON_PARSER_HPP
