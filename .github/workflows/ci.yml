@@ -215,6 +215,51 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  fuzz:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-19 ninja-build
+
+      - name: Configure build with CMake
+        env:
+          CC: clang-19
+          CXX: clang++-19
+        run: |
+          mkdir build
+          cd build
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DHOPPER_BUILD_FUZZER=ON -DHOPPER_BUILD_TESTS=OFF
+
+      - name: Build the fuzz harnesses
+        run: cmake --build build --target hopper_json_fuzzer hopper_clike_fuzzer
+
+      # A bounded run on every push: a minute per parser, seeded from the JSON test suite for the JSON parser. A
+      # Parse_error is the parser's answer to malformed input; a crash, a sanitizer report or a hang is a finding.
+      # print_new_funcs=0: symbolizing each newly covered function costs a symbolizer spawn per function and adds
+      # nothing here; crash reports are still symbolized.
+      - name: Fuzz the JSON parser
+        run: |
+          mkdir json-corpus
+          ./build/tools/fuzz/hopper_json_fuzzer json-corpus libs/json/tests/data/JSONTestSuite/test_parsing -max_total_time=60 \
+                -timeout=10 -rss_limit_mb=4096 -print_new_funcs=0
+
+      - name: Fuzz the C-like parser
+        run: |
+          mkdir clike-corpus
+          ./build/tools/fuzz/hopper_clike_fuzzer clike-corpus tools/fuzz/seeds/clike -max_total_time=60 -timeout=10 \
+                -rss_limit_mb=4096 -print_new_funcs=0
+
   install-consumer:
     runs-on: ubuntu-24.04
 

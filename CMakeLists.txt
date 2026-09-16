@@ -40,6 +40,15 @@ if (HOPPER_BUILD_TESTS)
     enable_testing()
 endif ()
 
+# Requires Clang, which carries libFuzzer. The whole tree is instrumented, the munch submodule included, not just the
+# harness: the fuzzer's coverage feedback and the sanitizers must see library code, so a fuzzer build is its own
+# dedicated build tree.
+option(HOPPER_BUILD_FUZZER "Build the libFuzzer harnesses for hopper (requires Clang)" OFF)
+if (HOPPER_BUILD_FUZZER)
+    add_compile_options(-fsanitize=address,undefined,fuzzer-no-link -fno-sanitize-recover=all)
+    add_link_options(-fsanitize=address,undefined)
+endif ()
+
 include(GNUInstallDirs)
 
 # Installing hopper means installing targets that link munch, and an exported target can only refer to munch as an
