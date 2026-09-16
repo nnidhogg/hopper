@@ -83,7 +83,7 @@ class Parser : public hopper::parse::Parser_base<Token_kind>
 {
 public:
     explicit Parser(const std::string& input)
-        : Parser_base{hopper::parse::Token_reader<Token_kind>{lexer(), input, is_trivia}}
+        : Parser_base{lexer(), input, is_trivia}
     {}
 
     Node parse_pair()

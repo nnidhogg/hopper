@@ -12,7 +12,10 @@ using namespace hopper::parse;
 
 namespace
 {
-enum class Kind : uint8_t
+/**
+ * @brief The token kinds of the test grammar: words, numbers, the trivia and the separators.
+ */
+enum class Kind : std::uint8_t
 {
     Word,
     Number,
@@ -21,11 +24,20 @@ enum class Kind : uint8_t
     Semicolon,
 };
 
+/**
+ * @brief The kinds the reader discards: whitespace alone.
+ * @param kind The kind asked about.
+ * @return True for whitespace.
+ */
 bool skip_trivia(const Kind kind)
 {
     return kind == Kind::Whitespace;
 }
 
+/**
+ * @brief Compiles the test grammar.
+ * @return The lexer.
+ */
 munch::core::Lexer build_lexer()
 {
     using namespace munch::regex;

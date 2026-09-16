@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+#include <variant>
 
 #include "hopper/json/value.hpp"
 #include "hopper/parse/parse_error.hpp"
@@ -36,7 +37,7 @@ Parse_error_kind failure(const std::string& text)
 {
     try
     {
-        (void)parse(text);
+        static_cast<void>(parse(text));
     }
     catch (const Parse_error& error)
     {
@@ -65,6 +66,7 @@ TEST(Json, Numbers_convert_to_the_nearest_double_and_saturate_past_the_range)
     EXPECT_DOUBLE_EQ(Number{.text = "-0"}.to_double(), -0.0);
     EXPECT_DOUBLE_EQ(Number{.text = "1e2"}.to_double(), 100.0);
     EXPECT_TRUE(std::isinf(Number{.text = "1e400"}.to_double()));
+    EXPECT_TRUE(std::isinf(Number{.text = "0.5e400"}.to_double()));
     EXPECT_TRUE(std::isinf(Number{.text = "-1e400"}.to_double()));
     EXPECT_LT(Number{.text = "-1e400"}.to_double(), 0.0);
     EXPECT_DOUBLE_EQ(Number{.text = "1e-400"}.to_double(), 0.0);
@@ -88,7 +90,7 @@ TEST(Json, A_lone_surrogate_escape_is_an_invalid_literal_at_the_string)
 
     try
     {
-        (void)parse("[1, \"\\udc00\"]");
+        static_cast<void>(parse("[1, \"\\udc00\"]"));
     }
     catch (const Parse_error& error)
     {
@@ -110,7 +112,7 @@ TEST(Json, Containers_keep_document_order_and_duplicates)
     EXPECT_EQ(object.find("a"), 1U);
     EXPECT_TRUE(object.at("a").as_bool());
     EXPECT_FALSE(object.find("missing").has_value());
-    EXPECT_THROW((void)object.at("missing"), std::out_of_range);
+    EXPECT_THROW(static_cast<void>(object.at("missing")), std::out_of_range);
 
     const auto& array{object.members[0].value.as_array()};
 
@@ -185,4 +187,27 @@ TEST(Json, Values_compare_by_content_and_not_by_span)
     EXPECT_EQ(parse("[1, {\"a\": \"b\"}]"), parse("  [ 1 , { \"a\" : \"\\u0062\" } ]"));
     EXPECT_NE(parse("[1]"), parse("[1.0]"));
     EXPECT_EQ(parse("null"), (Value{Null{}, {}}));
+}
+
+TEST(Json, Recover_moves_past_a_lexical_error_to_a_certified_start_and_parses_the_remainder)
+{
+    // The control byte matches no token. munch certifies the brace after the newline as a token start, the two
+    // bytes before it its evidence, so the second value parses after the recovery; the first is what the error
+    // cost.
+    hopper::json::Parser parser{std::string{"{\"a\": 1} \x01 \n{\"b\": [2, 3]}"}};
+
+    EXPECT_THROW(static_cast<void>(parser.parse()), hopper::parse::Parse_error);
+
+    const auto answer{parser.recover()};
+
+    ASSERT_TRUE(answer.has_value());
+    EXPECT_EQ(answer->start, 12U);
+    EXPECT_EQ(answer->evidence_begin, 10U);
+    EXPECT_TRUE(answer->window);
+
+    const auto value{parser.parse()};
+
+    EXPECT_EQ(value.span.begin.offset, 12U);
+    EXPECT_EQ(value.span.end.offset, 25U);
+    EXPECT_TRUE(std::holds_alternative<hopper::json::Object>(value.node));
 }

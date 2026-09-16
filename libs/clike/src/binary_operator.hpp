@@ -1,5 +1,5 @@
-#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_BINARY_OPERATOR_HPP
-#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_BINARY_OPERATOR_HPP
+#ifndef HOPPER_LIBS_CLIKE_SRC_BINARY_OPERATOR_HPP
+#define HOPPER_LIBS_CLIKE_SRC_BINARY_OPERATOR_HPP
 
 #include <optional>
 #include <string_view>
@@ -32,7 +32,7 @@ struct Binary_operator
  * @param spelling The fused operator spelling.
  * @return The operator's precedence and node kind, or nothing when the spelling is not a binary operator.
  */
-[[nodiscard]] std::optional<Binary_operator> binary_operator_for(std::string_view spelling);
+[[nodiscard]] std::optional<Binary_operator> binary_operator_for(std::string_view spelling) noexcept;
 
 /**
  * @brief Whether a spelling is a prefix of an operator the language knows, itself included.
@@ -46,4 +46,4 @@ struct Binary_operator
 
 } // namespace hopper::clike
 
-#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_BINARY_OPERATOR_HPP
+#endif // HOPPER_LIBS_CLIKE_SRC_BINARY_OPERATOR_HPP

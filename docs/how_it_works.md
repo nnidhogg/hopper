@@ -30,6 +30,7 @@ libs/
                           ast structs.
 tools/
   probes/                 hopper_edit_relex, the edit theorem run as a program over a generated corpus or a file.
+  fuzz/                   the two libFuzzer harnesses over the JSON and C-like parsers, with seeds/clike
 external/
   munch/                  The lexer library, as a submodule pinned to a release.
   googletest/             The test framework.

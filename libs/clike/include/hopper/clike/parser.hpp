@@ -31,15 +31,10 @@ class Parser : public parse::Parser_base<Token_kind>
 {
 public:
     /**
-     * @brief The token reader type this parser consumes.
-     */
-    using Token_reader_t = parse::Token_reader<Token_kind>;
-
-    /**
      * @brief Constructs a parser over a prepared reader.
      * @param reader The reader, whose lexer is expected to be lexer() with trivia discarded.
      */
-    explicit Parser(Token_reader_t reader);
+    explicit Parser(Reader_t reader);
 
     /**
      * @brief Constructs a parser over a text held in memory, using lexer() and discarding trivia.
@@ -52,14 +47,6 @@ public:
      * @param file The file to read.
      */
     explicit Parser(const std::filesystem::path& file);
-
-    /**
-     * @brief The base's input replacement, rewind and lexical recovery, made public: they are the parser's whole
-     *        contract for reading many inputs and resuming after a lexical error.
-     */
-    using parse::Parser_base<Token_kind>::load;
-    using parse::Parser_base<Token_kind>::reset;
-    using parse::Parser_base<Token_kind>::recover;
 
     /**
      * @brief Parses the whole input as one expression.
@@ -106,23 +93,6 @@ private:
          * @brief Where the input stood before the operator, where a construct ending at it closes.
          */
         parse::Source_position before;
-    };
-
-    /**
-     * @brief The pointer stars and the optional reference that follow a type or open a declarator, read the same way
-     *        wherever they occur.
-     */
-    struct Indirection
-    {
-        /**
-         * @brief How many stars.
-         */
-        std::size_t pointers;
-
-        /**
-         * @brief Whether an ampersand follows them.
-         */
-        bool reference;
     };
 
     /**
@@ -227,7 +197,7 @@ private:
      * @param what What the grammar expected, named in the error.
      * @return The token.
      */
-    Token_t expect_identifier(std::string_view what);
+    [[nodiscard]] Token_t expect_identifier(std::string_view what);
 
     /**
      * @brief Whether input remains, the fused operator included.
@@ -407,7 +377,7 @@ private:
      * @brief Parses pointer stars and an optional reference, both possibly absent.
      * @return What was read.
      */
-    [[nodiscard]] Indirection parse_indirection();
+    [[nodiscard]] ast::Indirection parse_indirection();
 
     /**
      * @brief Parses a declarator: its indirection, a name and an optional initializer.
@@ -437,7 +407,7 @@ private:
      * @param name The function's name.
      * @return The function.
      */
-    [[nodiscard]] ast::Function parse_function(ast::Type type, Indirection indirection, std::string name);
+    [[nodiscard]] ast::Function parse_function(ast::Type type, ast::Indirection indirection, std::string name);
 
     /**
      * @brief Parses one parameter: a type, its indirection, an optional name and an optional default.

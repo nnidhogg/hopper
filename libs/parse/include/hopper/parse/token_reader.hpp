@@ -3,15 +3,16 @@
 
 #include <filesystem>
 #include <fstream>
-#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
+#include <munch/common/concepts.hpp>
 #include <munch/core/lexer.hpp>
 #include <munch/tools/tokenizer/tokenizer.hpp>
 
+#include "hopper/parse/parse_error.hpp"
 #include "hopper/parse/token_lookahead.hpp"
 
 namespace hopper::parse
@@ -23,9 +24,9 @@ namespace hopper::parse
  * callers only ever see meaningful tokens. The input is tokenized exactly as given: locations count "\r\n" and a
  * lone '\r' as one newline each, and offsets always index the original bytes, so the token set must recognize
  * carriage returns wherever its inputs may carry them.
- * @tparam Kind The token kind type (enum or integral) produced by the lexer.
+ * @tparam Kind The token kind type produced by the lexer, an enum or an integral type.
  */
-template <typename Kind>
+template <munch::common::concepts::Token_id Kind>
 class Token_reader
 {
 public:
@@ -38,37 +39,35 @@ public:
     using Result_t = munch::tools::tokenizer::Tokenizer::Result_t<Kind>;
 
     /**
-     * @brief Predicate selecting the token kinds the stream discards; an empty one discards nothing.
+     * @brief Predicate selecting the token kinds the stream discards; a null one discards nothing.
      */
-    using Skip_t = std::function<bool(Kind)>;
+    using Skip_t = bool (*)(Kind);
 
     /**
-     * @brief Construct a token stream from a lexer.
+     * @brief Constructs a token stream from a lexer.
      * @param lexer Lexer used to recognize tokens.
      * @param skip Predicate selecting the token kinds to discard.
      */
-    explicit Token_reader(munch::core::Lexer lexer, Skip_t skip = {})
-        : tokenizer_{std::move(lexer)}, skip_{std::move(skip)}
-    {}
+    explicit Token_reader(munch::core::Lexer lexer, Skip_t skip = {}) : tokenizer_{std::move(lexer)}, skip_{skip} {}
 
     /**
-     * @brief Construct a token stream from a lexer and an input string held in memory.
+     * @brief Constructs a token stream from a lexer and an input string held in memory.
      * @param lexer Lexer used to recognize tokens.
      * @param input Input text to tokenize.
      * @param skip Predicate selecting the token kinds to discard.
      */
     explicit Token_reader(munch::core::Lexer lexer, const std::string& input, Skip_t skip = {})
-        : tokenizer_{std::move(lexer), input}, skip_{std::move(skip)}
+        : tokenizer_{std::move(lexer), input}, skip_{skip}
     {}
 
     /**
-     * @brief Construct a token stream by reading the contents of a file.
+     * @brief Constructs a token stream by reading the contents of a file.
      * @param lexer Lexer used to recognize tokens.
      * @param file Path to the file whose contents will be tokenized.
      * @param skip Predicate selecting the token kinds to discard.
      */
     explicit Token_reader(munch::core::Lexer lexer, const std::filesystem::path& file, Skip_t skip = {})
-        : tokenizer_{std::move(lexer), read(file)}, skip_{std::move(skip)}
+        : tokenizer_{std::move(lexer), read(file)}, skip_{skip}
     {}
 
     /**
@@ -85,7 +84,7 @@ public:
     /**
      * @brief Replaces the current input with a file's contents and rewinds.
      * @param file The file to read.
-     * @throws std::runtime_error If the file cannot be opened.
+     * @throws Parse_error With kind Unreadable_file when the file cannot be opened.
      */
     void load(const std::filesystem::path& file)
     {
@@ -105,7 +104,7 @@ public:
     }
 
     /**
-     * @brief Move past a lexical error to the next position the lexer certifies as a token start.
+     * @brief Moves past a lexical error to the next position the lexer certifies as a token start.
      *
      * Call it only when the last read returned a lexical error, so the stream stands at the failure with nothing
      * buffered; a buffered token means the caller is not at a lexical error, and the call throws rather than drop it.
@@ -136,7 +135,7 @@ public:
     }
 
     /**
-     * @brief Look at the next token without consuming it.
+     * @brief Looks at the next token without consuming it.
      *
      * Returns a `tokenizer::Token<Kind>` on success, a `tokenizer::End_of_input` marker at end of input, or a
      * `tokenizer::Error` if a lexical issue occurs.
@@ -173,7 +172,7 @@ public:
     }
 
     /**
-     * @brief Retrieve the next token from the stream.
+     * @brief Retrieves the next token from the stream.
      *
      * Returns a `tokenizer::Token<Kind>` on success, a `tokenizer::End_of_input` marker at end of input, or a
      * `tokenizer::Error` if a lexical issue occurs.
@@ -189,7 +188,7 @@ public:
     }
 
     /**
-     * @brief Access the location of the current token's first character.
+     * @brief The location of the current token's first character.
      *
      * Columns count bytes, not code points; offsets index the original input.
      */
@@ -207,10 +206,10 @@ public:
 
 private:
     /**
-     * @brief Read the entire file contents into a string, in binary mode and without normalization.
-     * @param file Path to the file to read.
-     * @return File contents as a std::string.
-     * @throws std::runtime_error If the file cannot be opened.
+     * @brief Reads the whole file into a string, in binary mode and without normalization.
+     * @param file The file to read.
+     * @return The file's bytes.
+     * @throws Parse_error With kind Unreadable_file and an empty span when the file cannot be opened.
      */
     static std::string read(const std::filesystem::path& file)
     {
@@ -219,7 +218,7 @@ private:
             return {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
         }
 
-        throw std::runtime_error("Token_reader: cannot open file: " + file.string());
+        throw Parse_error{Parse_error_kind::Unreadable_file, Source_span{}, "Cannot open file: " + file.string()};
     }
 
     /**
@@ -233,7 +232,7 @@ private:
     Token_lookahead<Kind> lookahead_;
 
     /**
-     * @brief The kinds discarded before the caller sees them; nullptr discards nothing.
+     * @brief The kinds discarded before the caller sees them; a null one discards nothing.
      */
     Skip_t skip_;
 };

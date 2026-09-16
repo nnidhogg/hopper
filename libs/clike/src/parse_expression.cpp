@@ -9,8 +9,9 @@
 #include <utility>
 #include <vector>
 
-#include "hopper/clike/binary_operator.hpp"
+#include "binary_operator.hpp"
 #include "hopper/clike/parser.hpp"
+#include "tables.hpp"
 
 namespace hopper::clike
 {
@@ -56,22 +57,6 @@ constexpr std::array<std::pair<std::string_view, ast::Cast_kind>, 4> casts{{
         {"const_cast", ast::Cast_kind::Const},
         {"reinterpret_cast", ast::Cast_kind::Reinterpret},
 }};
-
-/**
- * @brief Looks a spelling up in one of the tables above.
- * @tparam Table The table's type.
- * @param table The table.
- * @param spelling The spelling looked for.
- * @return The entry's value, or std::nullopt when the spelling is not in the table.
- */
-template <typename Table>
-[[nodiscard]] auto lookup(const Table& table, const std::string_view spelling)
-        -> std::optional<typename Table::value_type::second_type>
-{
-    const auto found{std::ranges::find(table, spelling, &Table::value_type::first)};
-
-    return found != table.end() ? std::optional{found->second} : std::nullopt;
-}
 
 /**
  * @brief The value an integer literal spells, when the platform's integer holds it.
@@ -441,7 +426,7 @@ std::optional<ast::Expr> Parser::parse_cast()
 
     const auto begin{here()};
 
-    (void)next_token();
+    static_cast<void>(next_token());
 
     expect_operator("<", "'<' after the cast keyword");
 

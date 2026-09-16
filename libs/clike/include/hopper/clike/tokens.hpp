@@ -45,9 +45,11 @@ enum class Token_kind : std::uint8_t
  * bytes ( ) [ ] { } ; , . : ?; the string a quote, any bytes but a quote or a newline, and a quote, with no escapes;
  * the line comment two slashes to the end of the line; the whitespace a run of spaces, tabs and newlines, so a
  * carriage return is not part of this grammar and an input carrying one does not tokenize.
- * @return The compiled lexer.
+ * @return The compiled lexer, built once for the process: compiling the token set walks the whole regex-to-DFA
+ *         pipeline, the tables are immutable once built, and the scan carries no state across calls, so one instance
+ *         serves every parser and every document on every thread.
  */
-[[nodiscard]] munch::core::Lexer lexer();
+[[nodiscard]] const munch::core::Lexer& lexer();
 
 } // namespace hopper::clike
 

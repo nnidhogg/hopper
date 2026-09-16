@@ -86,19 +86,19 @@ public:
      * @brief The text as it stands.
      * @return The text.
      */
-    [[nodiscard]] const std::string& text() const noexcept { return text_; }
+    [[nodiscard]] const std::string& text() const noexcept;
 
     /**
      * @brief The token stream as it stands, whitespace included, in offset order.
      * @return The tokens.
      */
-    [[nodiscard]] const std::vector<Piece>& tokens() const noexcept { return tokens_; }
+    [[nodiscard]] const std::vector<Piece>& tokens() const noexcept;
 
     /**
      * @brief Whether the whole text tokenizes.
      * @return True when the stream covers every byte.
      */
-    [[nodiscard]] bool complete() const noexcept { return complete_; }
+    [[nodiscard]] bool complete() const noexcept;
 
     /**
      * @brief Replaces a byte range and brings the stream current.

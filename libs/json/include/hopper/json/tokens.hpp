@@ -49,9 +49,11 @@ enum class Token_kind : std::uint8_t
  * the four whitespace bytes. A string whose bytes are not well-formed UTF-8 does not tokenize, so the parser never
  * sees one. The \u escapes are checked only for their hex digits here; pairing of surrogates is the parser's business,
  * since a lone surrogate is a valid token that names no character.
- * @return The compiled lexer.
+ * @return The compiled lexer, built once for the process: compiling the token set walks the whole regex-to-DFA
+ *         pipeline, the tables are immutable once built, and the scan carries no state across calls, so one instance
+ *         serves every parser and every document on every thread.
  */
-[[nodiscard]] munch::core::Lexer lexer();
+[[nodiscard]] const munch::core::Lexer& lexer();
 
 } // namespace hopper::json
 

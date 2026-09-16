@@ -45,7 +45,7 @@ bool accepts(const std::filesystem::path& file)
     {
         Parser parser{file};
 
-        (void)parser.parse();
+        static_cast<void>(parser.parse());
 
         return true;
     }

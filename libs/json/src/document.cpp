@@ -70,21 +70,6 @@ struct Rescan
 };
 
 /**
- * @brief The compiled JSON lexer, built once and shared by every document.
- *
- * Compiling the token set walks the whole regex-to-DFA pipeline, which costs far more than tokenizing a small
- * document; the tables are immutable once built and the scan carries no state across calls, so one instance serves
- * every document on every thread.
- * @return The lexer.
- */
-const munch::core::Lexer& shared_lexer()
-{
-    static const munch::core::Lexer instance{lexer()};
-
-    return instance;
-}
-
-/**
  * @brief The token the lexer matches at an offset, or nothing where no token begins there.
  *
  * A zero-width match would leave the position where it is, so it is treated as no match.
@@ -94,14 +79,14 @@ const munch::core::Lexer& shared_lexer()
  */
 std::optional<Piece> piece_at(const std::string_view text, const std::size_t at)
 {
-    const auto match{shared_lexer().tokenize<Token_kind>(text.substr(at))};
+    const auto [token, length]{lexer().tokenize<Token_kind>(text.substr(at))};
 
-    if (!match.token || match.length == 0)
+    if (!token || length == 0)
     {
         return std::nullopt;
     }
 
-    return Piece{.kind = *match.token, .offset = at, .length = match.length};
+    return Piece{.kind = *token, .offset = at, .length = length};
 }
 
 /**
@@ -156,7 +141,7 @@ Scan scan(const std::string_view text, const std::size_t from)
  */
 std::optional<std::size_t> anchor_before(const std::string_view text, const std::size_t offset)
 {
-    const auto& lexer{shared_lexer()};
+    const auto& scanner{lexer()};
 
     std::optional<std::size_t> anchor;
 
@@ -164,7 +149,7 @@ std::optional<std::size_t> anchor_before(const std::string_view text, const std:
     {
         for (auto from{offset > reach ? offset - reach : 0}; from <= offset;)
         {
-            const auto found{lexer.next_certified_evidence(text, from)};
+            const auto found{scanner.next_certified_evidence(text, from)};
 
             // The walk only runs forward, so once it reports a start past the edit there is nothing nearer to find.
             if (!found || found->start > offset)
@@ -326,6 +311,21 @@ Relex Document::relex_all()
     complete_ = complete;
 
     return {.rescanned = text_.size(), .whole = true};
+}
+
+const std::string& Document::text() const noexcept
+{
+    return text_;
+}
+
+const std::vector<Piece>& Document::tokens() const noexcept
+{
+    return tokens_;
+}
+
+bool Document::complete() const noexcept
+{
+    return complete_;
 }
 
 } // namespace hopper::json

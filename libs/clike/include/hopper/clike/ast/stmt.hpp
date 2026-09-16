@@ -150,16 +150,10 @@ struct Stmt
     using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, For, Do_while, Return, Declaration>;
 
     /**
-     * @brief The node this statement holds.
-     */
-    /**
      * @brief The statement itself.
      */
     Node_t node;
 
-    /**
-     * @brief The source range this statement was parsed from.
-     */
     /**
      * @brief The source range the statement was parsed from.
      */

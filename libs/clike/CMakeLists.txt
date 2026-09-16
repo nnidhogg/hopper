@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20.6)
 cmake_policy(SET CMP0097 NEW)
 project(hopper_clike)
 
-include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME}
         src/lexer.cpp
@@ -24,10 +23,10 @@ target_include_directories(${PROJECT_NAME}
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+# munch is header-visible: the token kinds and the lexer accessor name its types, so consumers link it too.
 target_link_libraries(${PROJECT_NAME}
         PUBLIC
         hopper_parse
-        PRIVATE
         munch::munch
 )
 
@@ -40,7 +39,6 @@ if (HOPPER_BUILD_TESTS)
     target_link_libraries(${PROJECT_NAME}_tests
             PRIVATE
             ${PROJECT_NAME}
-            munch::munch
             gtest_main
     )
 

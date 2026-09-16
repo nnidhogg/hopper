@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.20.6)
 cmake_policy(SET CMP0097 NEW)
 project(hopper_parse)
 
-include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME}
         src/parse_error.cpp

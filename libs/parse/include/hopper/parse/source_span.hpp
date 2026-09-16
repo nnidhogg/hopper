@@ -12,8 +12,6 @@ namespace hopper::parse
  */
 struct Source_position
 {
-    bool operator==(const Source_position&) const = default;
-
     /**
      * @brief The byte offset from the start of the input, counted from zero.
      */
@@ -28,6 +26,12 @@ struct Source_position
      * @brief The column within the line, counted from one in bytes.
      */
     std::size_t column{1};
+
+    /**
+     * @brief Two positions are equal when their fields are.
+     * @return True when equal.
+     */
+    bool operator==(const Source_position&) const = default;
 };
 
 /**
@@ -35,8 +39,6 @@ struct Source_position
  */
 struct Source_span
 {
-    bool operator==(const Source_span&) const = default;
-
     /**
      * @brief The first byte of the construct.
      */
@@ -46,6 +48,12 @@ struct Source_span
      * @brief One past the construct's last byte.
      */
     Source_position end{};
+
+    /**
+     * @brief Two spans are equal when their fields are.
+     * @return True when equal.
+     */
+    bool operator==(const Source_span&) const = default;
 };
 
 } // namespace hopper::parse

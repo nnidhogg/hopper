@@ -22,13 +22,12 @@ JSONTestSuite, parsed with an explicit stack so nesting depth is bounded by memo
 keywords and multi-byte operators out of the campaign's coarse tokens the way a C lexer would have, so a parser over the
 measured grammar exists beside the measurements.
 
-## **Status: pre-1.0**
+## **Status**
 
-The kit is stable in shape and used by both grammars; the public names may still change before 1.0, after which the
-versioning rule is munch's, additive within a major version. What is not here yet is the parser-level half of
-certified resumption: after a lexical error the kit moves the stream to munch's next certified token start, and what
-a parser may assume about its own state at that point is the open question the JSON grammar was chosen to ask; see
-[docs/design.md](docs/design.md).
+The kit and the two grammars are complete for what they claim, the suite is held to the JSONTestSuite and to the
+campaign grammar, and the public names below are the ones 1.0 fixes. What is deliberately outside 1.x is a parser-level
+policy after recovery: the kit moves the stream to munch's next certified token start, and what a parser may assume
+about its own state there is a question this library asks and does not answer; see [docs/design.md](docs/design.md).
 
 ## **Features**
 
@@ -149,13 +148,34 @@ warnings-as-errors are enabled by default only when hopper is the top-level proj
 `add_subdirectory` opts in with `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`. The probe under `tools/probes/`
 is a self-checking executable registered with CTest as well; given a JSON file it prints the edit figures instead.
 
+Two libFuzzer harnesses under `tools/fuzz/` feed arbitrary bytes to the JSON and C-like parsers; a `Parse_error` is the
+parser's answer to malformed input, and a crash, a sanitizer report or a hang is a finding. They build in a dedicated
+tree configured with Clang and `-DHOPPER_BUILD_FUZZER=ON`, which instruments the whole tree, the munch submodule
+included, and CI runs each for a bounded minute on every push.
+
 ## **Versioning and Stability**
 
-hopper is pre-1.0: the kit's public names, `parse::Token_reader`, `parse::Parser_base`, `parse::Parse_error`,
-`parse::Source_span` and their members, and the two grammars' `Parser` and tree types may still change before 1.0.
-From 1.0 the rule is munch's: a minor release adds and never removes or renames on the stable surface named here,
-and a major release is the only place a name disappears. The munch submodule is pinned to a release, and a hopper
-release names the munch release it was built and tested against.
+hopper follows semantic versioning, munch's rule: a minor release adds and never removes or renames on the stable
+surface, and a major release is the only place a name disappears. The stable surface is what this README and
+[docs/usage.md](docs/usage.md) document. In the kit: `parse::Token_reader<Kind>` with `load()`, `reset()`, `recover()`,
+its `Token_lookahead` and its locations, `parse::Parser_base<Kind>` with `peek_token()`, `next_token()`, `check()`,
+`accept()`, `expect()`, `require()`, `consume()`, `mark()`, `span_from()` and its error raisers, `parse::Parse_error`
+with `Parse_error_kind`, `parse::Source_position`, `parse::Source_span` and `parse::Token_location`. In the grammars:
+`json::Parser`, `json::Value` with `Null`, `Number`, `Array`, `Object` and `Member`, `json::Document` with `Piece` and
+`Relex`, `clike::Parser` with its `ast` types, and each grammar's `Token_kind`, `lexer()` and `is_trivia()`. Everything
+under `hopper::parse` is the kit and changes only by addition within a major version; the grammars are reference front
+ends and follow the same rule, a new production or node arriving in a minor version.
+
+**Errors.** A parser fails fast: malformed input raises `parse::Parse_error` with its kind and the span it points at,
+and nothing is repaired or guessed. Recovery is explicit and lexical, `Parser_base::recover()` under munch's
+complete-repair invariance, and what a grammar does with a resumed stream is that grammar's policy; the kit promises no
+syntactic recovery in 1.x. Precondition violations, such as `recover()` with a token buffered, throw `std::logic_error`.
+Nesting is bounded by memory in the JSON parser, which keeps an explicit stack, and by the call stack in the C-like
+parser, which is recursive.
+
+**Platforms.** The promise is munch's: Linux with GCC 13 or later and Clang 19 or later, source compatibility within a
+major version and no ABI promise. CI builds, tests, sanitizes and fuzzes on x86-64 and ARM64. The munch submodule is
+pinned to a release, and a hopper release names the munch release it was built and tested against.
 
 ## **License**
 

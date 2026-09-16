@@ -21,14 +21,9 @@ namespace hopper::clike::ast
 struct Declarator
 {
     /**
-     * @brief The pointer depth: one star per level.
+     * @brief The pointer depth and reference bit before the name.
      */
-    std::size_t pointers;
-
-    /**
-     * @brief Whether the declared name is a reference.
-     */
-    bool reference;
+    Indirection indirection;
 
     /**
      * @brief The declared name.

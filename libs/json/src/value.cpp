@@ -1,9 +1,12 @@
 #include "hopper/json/value.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -18,69 +21,44 @@ namespace hopper::json
 namespace
 {
 /**
- * @brief The decimal exponent a spelling carries: the count of integer digits, or minus the count of leading
- *        fraction zeros when the integer part is zero, plus the written exponent.
+ * @brief Whether a spelling from_chars refused lies past the largest double rather than under the smallest.
  *
- * The written exponent is saturated at a billion so that an exponent of any length is read without overflow; the
- * sign of the result is all a caller needs, since it decides which side of the double range a refused spelling
- * lies on.
- * @param text The spelling, already known to match the RFC grammar.
- * @return The decimal exponent, positive for a magnitude of at least ten.
+ * The spelling matches the RFC grammar, so its parts sit at fixed separators: the sign, the point, the exponent
+ * marker. The side follows from the sign of the decimal exponent, the count of integer digits, or minus the count of
+ * leading fraction zeros when the integer part is zero, plus the written exponent. The written exponent is clamped
+ * to a billion either way, so an exponent of any length is read without overflow and still names its side.
+ * @param text The spelling, already known to match the RFC grammar and refused as out of range.
+ * @return True when the magnitude is at least ten to some positive power, which is the overflow side.
  */
-long long decimal_exponent(const std::string_view text)
+bool overflows(const std::string_view text)
 {
-    std::size_t at{text.front() == '-' ? 1U : 0U};
+    constexpr long long bound{1'000'000'000};
 
-    long long exponent{0};
+    const auto unsigned_text{text.substr(text.front() == '-' ? 1 : 0)};
+    const auto marker{unsigned_text.find_first_of("eE")};
+    const auto mantissa{unsigned_text.substr(0, marker)};
+    const auto point{mantissa.find('.')};
+    const auto integer{mantissa.substr(0, point)};
+    const auto fraction{point == std::string_view::npos ? std::string_view{} : mantissa.substr(point + 1)};
 
-    if (text[at] == '0')
+    const auto leading_zeros{std::min(fraction.find_first_not_of('0'), fraction.size())};
+
+    long long exponent{
+            integer == "0" ? -static_cast<long long>(leading_zeros) : static_cast<long long>(integer.size())};
+
+    if (marker != std::string_view::npos)
     {
-        ++at;
+        const auto written{unsigned_text.substr(marker + 1 + (unsigned_text[marker + 1] == '+' ? 1 : 0))};
 
-        if (at < text.size() && text[at] == '.')
-        {
-            ++at;
+        long long value{0};
 
-            while (at < text.size() && text[at] == '0')
-            {
-                --exponent;
-                ++at;
-            }
-        }
-    }
-    else
-    {
-        while (at < text.size() && text[at] >= '0' && text[at] <= '9')
-        {
-            ++exponent;
-            ++at;
-        }
+        const auto [end, error]{std::from_chars(written.data(), written.data() + written.size(), value)};
+
+        exponent += error == std::errc::result_out_of_range ? (written.front() == '-' ? -bound : bound) :
+                                                              std::clamp(value, -bound, bound);
     }
 
-    const auto marker{text.find_first_of("eE")};
-
-    if (marker == std::string_view::npos)
-    {
-        return exponent;
-    }
-
-    auto digit{marker + 1};
-
-    const bool negative{text[digit] == '-'};
-
-    if (text[digit] == '-' || text[digit] == '+')
-    {
-        ++digit;
-    }
-
-    long long written{0};
-
-    for (; digit < text.size(); ++digit)
-    {
-        written = written > 1'000'000'000 ? written : written * 10 + (text[digit] - '0');
-    }
-
-    return exponent + (negative ? -written : written);
+    return exponent > 0;
 }
 
 /**
@@ -123,10 +101,10 @@ double Number::to_double() const
     const auto [end, error]{std::from_chars(text.data(), text.data() + text.size(), value)};
 
     // from_chars refuses exactly the spellings whose magnitude exceeds the largest double or falls under the smallest
-    // subnormal, and leaves the value untouched, so the side is read off the decimal exponent the spelling carries.
+    // subnormal, and leaves the value untouched, so the side is read off the spelling.
     if (error == std::errc::result_out_of_range)
     {
-        const double magnitude{decimal_exponent(text) > 0 ? std::numeric_limits<double>::infinity() : 0.0};
+        const double magnitude{overflows(text) ? std::numeric_limits<double>::infinity() : 0.0};
 
         return text.front() == '-' ? -magnitude : magnitude;
     }
@@ -141,15 +119,16 @@ bool Array::operator==(const Array& other) const
 
 std::optional<std::size_t> Object::find(const std::string_view name) const noexcept
 {
-    for (auto index{members.size()}; index > 0; --index)
+    // The last member of a name answers, so the search runs from the back.
+    const auto reversed{std::views::reverse(members)};
+    const auto found{std::ranges::find(reversed, name, &Member::name)};
+
+    if (found == reversed.end())
     {
-        if (members[index - 1].name == name)
-        {
-            return index - 1;
-        }
+        return std::nullopt;
     }
 
-    return std::nullopt;
+    return static_cast<std::size_t>(std::distance(members.begin(), found.base())) - 1;
 }
 
 const Value& Object::at(const std::string_view name) const

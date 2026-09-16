@@ -10,8 +10,9 @@
 namespace hopper::parse
 {
 /**
- * @brief What went wrong: the input failed to tokenize, a token was not the expected one, the input ended, or a
- *        token the grammar admits spells a value the language rejects, such as a lone surrogate escape.
+ * @brief What went wrong: the input failed to tokenize, a token was not the expected one, the input ended, a
+ *        token the grammar admits spells a value the language rejects, such as a lone surrogate escape, or the
+ *        file named as input could not be read.
  */
 enum class Parse_error_kind : std::uint8_t
 {
@@ -19,6 +20,7 @@ enum class Parse_error_kind : std::uint8_t
     Unexpected_token,
     Unexpected_end,
     Invalid_literal,
+    Unreadable_file,
 };
 
 /**

@@ -1,9 +1,10 @@
 #include "hopper/clike/parser.hpp"
 
+#include <algorithm>
 #include <array>
 #include <utility>
 
-#include "hopper/clike/binary_operator.hpp"
+#include "binary_operator.hpp"
 #include "hopper/parse/parse_error.hpp"
 
 namespace hopper::clike
@@ -40,26 +41,18 @@ constexpr std::array<std::string_view, 19> keywords{"true",
  */
 bool is_keyword(const std::string_view spelling) noexcept
 {
-    for (const auto keyword : keywords)
-    {
-        if (keyword == spelling)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::ranges::contains(keywords, spelling);
 }
 
 } // namespace
 
-Parser::Parser(Token_reader_t reader) : Parser_base{std::move(reader)}
+Parser::Parser(Reader_t reader) : Parser_base{std::move(reader)}
 {}
 
-Parser::Parser(const std::string& input) : Parser{Token_reader_t{lexer(), input, &is_trivia}}
+Parser::Parser(const std::string& input) : Parser_base{lexer(), input, is_trivia}
 {}
 
-Parser::Parser(const std::filesystem::path& file) : Parser{Token_reader_t{lexer(), file, &is_trivia}}
+Parser::Parser(const std::filesystem::path& file) : Parser_base{lexer(), file, is_trivia}
 {}
 
 parse::Source_position Parser::here()
@@ -102,7 +95,7 @@ std::optional<Parser::Operator> Parser::peek_operator()
             break;
         }
 
-        (void)next_token();
+        static_cast<void>(next_token());
 
         spelling = candidate;
 
@@ -165,7 +158,7 @@ bool Parser::accept_punctuation(const char byte)
         return false;
     }
 
-    (void)next_token();
+    static_cast<void>(next_token());
 
     return true;
 }
@@ -197,7 +190,7 @@ bool Parser::accept_keyword(const std::string_view word)
         return false;
     }
 
-    (void)next_token();
+    static_cast<void>(next_token());
 
     return true;
 }
@@ -253,14 +246,7 @@ void Parser::unexpected(const std::string_view what)
                 "Syntax error: Expected " + std::string(what) + ", got '" + pending_->spelling + "'"};
     }
 
-    const auto token{next_token()};
-
-    if (!token)
-    {
-        eof_error("Expected " + std::string(what) + " before end of input");
-    }
-
-    syntax_error("Expected " + std::string(what), *token);
+    syntax_error("Expected " + std::string(what), require(what));
 }
 
 } // namespace hopper::clike

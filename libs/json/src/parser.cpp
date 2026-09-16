@@ -195,13 +195,13 @@ std::size_t append_unicode_escape(
 
 } // namespace
 
-Parser::Parser(Token_reader_t reader) : parse::Parser_base<Token_kind>{std::move(reader)}
+Parser::Parser(Reader_t reader) : Parser_base{std::move(reader)}
 {}
 
-Parser::Parser(const std::string& input) : Parser{Token_reader_t{lexer(), input, is_trivia}}
+Parser::Parser(const std::string& input) : Parser_base{lexer(), input, is_trivia}
 {}
 
-Parser::Parser(const std::filesystem::path& file) : Parser{Token_reader_t{lexer(), file, is_trivia}}
+Parser::Parser(const std::filesystem::path& file) : Parser_base{lexer(), file, is_trivia}
 {}
 
 Value Parser::parse()
@@ -269,18 +269,6 @@ std::string Parser::unescape(const std::string_view lexeme, const parse::Source_
     return out;
 }
 
-Parser::Token_t Parser::next_or_end(const std::string_view what)
-{
-    const auto token{next_token()};
-
-    if (!token)
-    {
-        eof_error("Expected " + std::string{what} + " before end of input");
-    }
-
-    return *token;
-}
-
 Value Parser::scalar(const Token_t& token, const parse::Source_span& span)
 {
     switch (token.kind())
@@ -306,7 +294,7 @@ std::string Parser::member_name()
 
     auto text{unescape(name.lexeme(), span_from(begin))};
 
-    (void)expect(Token_kind::Colon, "':' after the member name");
+    consume(Token_kind::Colon, "':' after the member name");
 
     return text;
 }
@@ -315,7 +303,7 @@ std::optional<Value> Parser::begin_value(std::vector<Frame>& open)
 {
     const auto begin{mark()};
 
-    const auto token{next_or_end("a value")};
+    const auto token{require("a value")};
 
     switch (token.kind())
     {
@@ -363,7 +351,7 @@ std::optional<Value> Parser::place(std::vector<Frame>& open, Value value)
     {
         std::get<Array>(top.container.node).elements.push_back(std::move(value));
 
-        const auto token{next_or_end("',' or ']'")};
+        const auto token{require("',' or ']'")};
 
         if (token.kind() == Token_kind::Comma)
         {
@@ -381,7 +369,7 @@ std::optional<Value> Parser::place(std::vector<Frame>& open, Value value)
         std::get<Object>(top.container.node)
                 .members.push_back({.name = std::move(top.name), .value = std::move(value)});
 
-        const auto token{next_or_end("',' or '}'")};
+        const auto token{require("',' or '}'")};
 
         if (token.kind() == Token_kind::Comma)
         {
@@ -399,7 +387,7 @@ std::optional<Value> Parser::place(std::vector<Frame>& open, Value value)
     return close(open);
 }
 
-Value Parser::close(std::vector<Frame>& open)
+Value Parser::close(std::vector<Frame>& open) const
 {
     auto container{std::move(open.back().container)};
 

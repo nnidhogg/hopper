@@ -28,14 +28,9 @@ struct Parameter
     Type type;
 
     /**
-     * @brief The pointer depth: one star per level.
+     * @brief The pointer depth and reference bit after the type.
      */
-    std::size_t pointers;
-
-    /**
-     * @brief Whether the parameter is a reference.
-     */
-    bool reference;
+    Indirection indirection;
 
     /**
      * @brief The parameter's name, empty when unnamed.
@@ -62,14 +57,9 @@ struct Function
     Type return_type;
 
     /**
-     * @brief The return type's pointer depth.
+     * @brief The return type's pointer depth and reference bit.
      */
-    std::size_t pointers;
-
-    /**
-     * @brief Whether the return type is a reference.
-     */
-    bool reference;
+    Indirection indirection;
 
     /**
      * @brief The function's name.
@@ -103,25 +93,16 @@ struct Translation_unit
         using Node_t = std::variant<Declaration, Function>;
 
         /**
-         * @brief The node this item holds.
-         */
-        /**
          * @brief The item itself.
          */
         Node_t node;
 
-        /**
-         * @brief The source range this item was parsed from.
-         */
         /**
          * @brief The source range the item was parsed from.
          */
         parse::Source_span span{};
     };
 
-    /**
-     * @brief The items in source order.
-     */
     /**
      * @brief The items, in source order.
      */

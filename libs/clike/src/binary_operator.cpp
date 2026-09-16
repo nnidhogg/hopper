@@ -1,8 +1,10 @@
-#include "hopper/clike/binary_operator.hpp"
+#include "binary_operator.hpp"
 
 #include <algorithm>
 #include <array>
 #include <utility>
+
+#include "tables.hpp"
 
 namespace hopper::clike
 {
@@ -44,11 +46,9 @@ constexpr std::array<std::string_view, 34> operators{
 
 } // namespace
 
-std::optional<Binary_operator> binary_operator_for(const std::string_view spelling)
+std::optional<Binary_operator> binary_operator_for(const std::string_view spelling) noexcept
 {
-    const auto found{std::ranges::find(ladder, spelling, &std::pair<std::string_view, Binary_operator>::first)};
-
-    return found != ladder.end() ? std::optional{found->second} : std::nullopt;
+    return lookup(ladder, spelling);
 }
 
 bool is_operator_prefix(const std::string_view spelling) noexcept

@@ -22,8 +22,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <iostream>
 #include <iterator>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <string>
@@ -38,7 +38,10 @@ using hopper::json::Document;
 using hopper::json::Piece;
 using hopper::json::Token_kind;
 
-std::size_t failures{0}; ///< Expectations that did not hold, which decide the exit status.
+/**
+ * @brief Expectations that did not hold, which decide the exit status.
+ */
+std::size_t failures{0};
 
 /**
  * @brief Records an expectation, printing the failed ones.
@@ -50,7 +53,7 @@ void expect(const bool condition, const std::string_view what)
     if (!condition)
     {
         ++failures;
-        std::cout << "FAIL: " << what << "\n";
+        std::printf("FAIL: %.*s\n", static_cast<int>(what.size()), what.data());
     }
 }
 
@@ -109,8 +112,19 @@ std::string generate(std::mt19937& random, const int depth)
  */
 struct Edit
 {
+    /**
+     * @brief Where the edit begins.
+     */
     std::size_t offset;
+
+    /**
+     * @brief How many bytes it removes there.
+     */
     std::size_t removed;
+
+    /**
+     * @brief The bytes it inserts in their place.
+     */
     std::string inserted;
 };
 
@@ -212,9 +226,20 @@ std::optional<Edit> edit_for(const std::string& text, const Piece& token, const 
  */
 struct Figures
 {
+    /**
+     * @brief Edits applied.
+     */
     std::size_t edits;
+
+    /**
+     * @brief Edits that relexed the whole text.
+     */
     std::size_t whole;
-    std::vector<std::size_t> rescanned; ///< Bytes rescanned per edit, sorted.
+
+    /**
+     * @brief Bytes rescanned per edit, sorted.
+     */
+    std::vector<std::size_t> rescanned;
 };
 
 /**
@@ -293,12 +318,7 @@ void print(const Figures& figures)
         return;
     }
 
-    std::size_t sum{0};
-
-    for (const auto bytes : figures.rescanned)
-    {
-        sum += bytes;
-    }
+    const auto sum{std::accumulate(figures.rescanned.begin(), figures.rescanned.end(), std::size_t{0})};
 
     const auto& r{figures.rescanned};
 
@@ -318,7 +338,7 @@ int main(const int argc, char** argv)
 
         if (!in)
         {
-            std::cerr << "cannot open " << argv[1] << "\n";
+            std::fprintf(stderr, "cannot open %s\n", argv[1]);
             return 1;
         }
 
@@ -326,7 +346,7 @@ int main(const int argc, char** argv)
 
         if (!document.complete())
         {
-            std::cerr << argv[1] << " does not tokenize completely\n";
+            std::fprintf(stderr, "%s does not tokenize completely\n", argv[1]);
             return 1;
         }
 
@@ -354,7 +374,7 @@ int main(const int argc, char** argv)
     expect(figures.edits > 100, "the schedule applied a hundred edits or more");
     expect(figures.whole * 20 < figures.edits, "at most one edit in twenty relexed the whole corpus");
 
-    std::cout << (failures == 0 ? "OK" : "FAILED") << "\n";
+    std::printf("%s\n", failures == 0 ? "OK" : "FAILED");
 
     return failures == 0 ? 0 : 1;
 }

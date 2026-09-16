@@ -7,7 +7,13 @@
 
 namespace hopper::json
 {
-munch::core::Lexer lexer()
+namespace
+{
+/**
+ * @brief Compiles the token set into a lexer.
+ * @return The lexer.
+ */
+munch::core::Lexer build()
 {
     using namespace munch::regex;
 
@@ -46,6 +52,15 @@ munch::core::Lexer lexer()
     builder.add_token(plus(any_of(Set{' ', '\t', '\n', '\r'})), Token_kind::Whitespace, 1);
 
     return builder.build();
+}
+
+} // namespace
+
+const munch::core::Lexer& lexer()
+{
+    static const munch::core::Lexer instance{build()};
+
+    return instance;
 }
 
 } // namespace hopper::json

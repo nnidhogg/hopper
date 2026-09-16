@@ -65,6 +65,8 @@ std::string generate(std::mt19937& random, const int depth)
     }
 }
 
+} // namespace
+
 TEST(Document, The_stream_covers_the_text_and_matches_a_whole_scan_after_each_edit)
 {
     std::mt19937 random{20260907};
@@ -151,8 +153,6 @@ TEST(Document, Ranges_outside_the_text_are_refused)
 {
     Document document{"[1]"};
 
-    EXPECT_THROW((void)document.edit(4, 0, ""), std::out_of_range);
-    EXPECT_THROW((void)document.edit(2, 5, ""), std::out_of_range);
+    EXPECT_THROW(static_cast<void>(document.edit(4, 0, "")), std::out_of_range);
+    EXPECT_THROW(static_cast<void>(document.edit(2, 5, "")), std::out_of_range);
 }
-
-} // namespace

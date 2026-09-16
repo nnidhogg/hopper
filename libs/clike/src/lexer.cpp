@@ -6,7 +6,13 @@
 
 namespace hopper::clike
 {
-munch::core::Lexer lexer()
+namespace
+{
+/**
+ * @brief Compiles the token set into a lexer.
+ * @return The lexer.
+ */
+munch::core::Lexer build()
 {
     using namespace munch::regex;
 
@@ -24,6 +30,15 @@ munch::core::Lexer lexer()
     builder.add_token(concat(text("//"), kleene(any_of(Set::all() - Set{'\n'}))), Token_kind::Line_comment, 1);
 
     return builder.build();
+}
+
+} // namespace
+
+const munch::core::Lexer& lexer()
+{
+    static const munch::core::Lexer instance{build()};
+
+    return instance;
 }
 
 } // namespace hopper::clike
