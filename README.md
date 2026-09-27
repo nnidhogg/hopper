@@ -25,7 +25,7 @@ measured grammar exists beside the measurements.
 ## **Status**
 
 The kit and the two grammars are complete for what they claim, the suite is held to the JSONTestSuite and to the
-campaign grammar, and the public names below are the ones 1.0 fixes. What is deliberately outside 1.x is a parser-level
+campaign grammar, and the public names below are fixed from 1.0 on. What is deliberately outside 1.x is a parser-level
 policy after recovery: the kit moves the stream to munch's next certified token start, and what a parser may assume
 about its own state there is a question this library asks and does not answer; see [docs/design.md](docs/design.md).
 
