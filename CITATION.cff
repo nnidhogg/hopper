@@ -28,6 +28,6 @@ references:
       - family-names: "Nidhögg"
         given-names: "Nicklas"
         orcid: "https://orcid.org/0009-0006-6161-6150"
-    version: 1.6.0
-    doi: "10.5281/zenodo.22544477"
+    version: 2.0.0
+    doi: "10.5281/zenodo.22984079"
     url: "https://github.com/nnidhogg/munch"
