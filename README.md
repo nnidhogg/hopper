@@ -6,6 +6,10 @@
   <img src="https://github.com/nnidhogg/hopper/actions/workflows/codeql.yml/badge.svg" alt="CodeQL">
   <img src="https://codecov.io/gh/nnidhogg/hopper/branch/master/graph/badge.svg" alt="Coverage">
   <img src="https://img.shields.io/github/license/nnidhogg/hopper" alt="License">
+  <img src="https://img.shields.io/github/v/release/nnidhogg/hopper?include_prereleases&sort=semver" alt="Release">
+  <a href="https://doi.org/10.5281/zenodo.22998777">
+    <img src="https://zenodo.org/badge/1096727911.svg" alt="DOI">
+  </a>
 </p>
 
 `hopper` is a **C++23 library** for building **recursive-descent parsers** on top of
@@ -189,4 +193,4 @@ MIT, see [LICENSE](LICENSE). The vendored JSONTestSuite cases are MIT as well; t
 
 ## **Author**
 
-Developed and maintained by **Nicklas Nidhögg** GitHub: [nnidhogg](https://github.com/nnidhogg)
+Developed and maintained by **Nicklas Nidhögg**, [nnidhogg](https://github.com/nnidhogg) on GitHub.

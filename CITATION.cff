@@ -23,6 +23,7 @@ url: "https://github.com/nnidhogg/hopper"
 license: MIT
 version: 1.0.0
 date-released: "2026-09-27"
+doi: "10.5281/zenodo.22998777"
 references:
   - type: software
     title: "munch"
