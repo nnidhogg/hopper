@@ -5,6 +5,7 @@
 #include <string_view>
 #include <utility>
 
+#include <munch/common/concepts.hpp>
 #include <munch/tools/tokenizer/token.hpp>
 
 #include "hopper/parse/token_location.hpp"
@@ -14,11 +15,11 @@ namespace hopper::parse
 /**
  * @brief The one token a Token_reader holds ahead of the parser, with the positions around it.
  *
- * Three positions travel with the token: where it begins, where the cursor stands after it, and where the last
- * consumed token ended, which is where a construct that has just finished stops whatever is buffered ahead of it.
- * @tparam Kind The token kind type (enum or integral) produced by the lexer.
+ * Three positions travel with the token: where it begins, where the cursor stands after it, and where the last consumed
+ * token ended, which is where a construct that has just finished stops whatever is buffered ahead of it.
+ * @tparam Kind The token kind type produced by the lexer, an enum or an integral type.
  */
-template <typename Kind>
+template <munch::common::concepts::Token_id Kind>
 class Token_lookahead
 {
 public:

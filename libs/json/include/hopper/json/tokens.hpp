@@ -45,13 +45,15 @@ enum class Token_kind : std::uint8_t
  * The token set is RFC 8259's: strings whose interior is any code point from U+0020 up except the quote and the
  * backslash, encoded as well-formed UTF-8, or one of the eight simple escapes, or a \u escape of four hex digits;
  * numbers as the RFC grammar spells them, an optional minus, an integer part without leading zeros, an optional
- * fraction and an optional exponent; the literals true, false and null; the six structural characters; and runs of
- * the four whitespace bytes. A string whose bytes are not well-formed UTF-8 does not tokenize, so the parser never
- * sees one. The \u escapes are checked only for their hex digits here; pairing of surrogates is the parser's business,
- * since a lone surrogate is a valid token that names no character.
- * @return The compiled lexer.
+ * fraction and an optional exponent; the literals true, false and null; the six structural characters; and runs of the
+ * four whitespace bytes. A string whose bytes are not well-formed UTF-8 does not tokenize, so the parser never sees
+ * one. The \u escapes are checked only for their hex digits here; pairing of surrogates is the parser's business, since
+ * a lone surrogate is a valid token that names no character.
+ * @return The compiled lexer, built once for the process: compiling the token set walks the whole regex-to-DFA
+ *         pipeline, the tables are immutable once built, and the scan carries no state across calls, so one instance
+ *         serves every parser and every document on every thread.
  */
-[[nodiscard]] munch::core::Lexer lexer();
+[[nodiscard]] const munch::core::Lexer& lexer();
 
 } // namespace hopper::json
 

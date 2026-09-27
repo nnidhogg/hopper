@@ -4,6 +4,8 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
 
 #include <munch/core/builder.hpp>
 #include <munch/regex/regex.hpp>
@@ -12,7 +14,10 @@ using namespace hopper::parse;
 
 namespace
 {
-enum class Kind : uint8_t
+/**
+ * @brief The token kinds of the test grammar: words, numbers, the trivia and the separators.
+ */
+enum class Kind : std::uint8_t
 {
     Word,
     Number,
@@ -21,16 +26,25 @@ enum class Kind : uint8_t
     Semicolon,
 };
 
+/**
+ * @brief The kinds the reader discards: whitespace alone.
+ * @param kind The kind asked about.
+ * @return True for whitespace.
+ */
 bool skip_trivia(const Kind kind)
 {
     return kind == Kind::Whitespace;
 }
 
+/**
+ * @brief Compiles the test grammar.
+ * @return The lexer.
+ */
 munch::core::Lexer build_lexer()
 {
     using namespace munch::regex;
 
-    munch::core::Builder builder;
+    munch::core::Builder builder{};
 
     builder.add_token(plus(any_of(Set::alpha())), Kind::Word, 1);
     builder.add_token(plus(any_of(Set::digits())), Kind::Number, 1);
@@ -109,10 +123,33 @@ TEST(Token_reader_test, Load_replaces_the_input_and_reset_rewinds_it)
     EXPECT_EQ(reader.next().token().lexeme(), "second");
 }
 
+TEST(Token_reader_test, A_copied_or_moved_reader_hands_out_its_own_buffered_token)
+{
+    Token_reader<Kind> original{build_lexer(), std::string{"2"}, skip_trivia};
+
+    std::ignore = original.peek();
+
+    Token_reader<Kind> copy{original};
+
+    original.load(std::string{"3"});
+
+    EXPECT_EQ(copy.next().token().lexeme(), "2");
+
+    Token_reader<Kind> source{build_lexer(), std::string{"2"}, skip_trivia};
+
+    std::ignore = source.peek();
+
+    Token_reader<Kind> moved{std::move(source)};
+
+    source.load(std::string{"3"});
+
+    EXPECT_EQ(moved.next().token().lexeme(), "2");
+}
+
 TEST(Token_reader_test, Windows_newlines_are_one_token_and_offsets_stay_original)
 {
-    // The input is tokenized exactly as given: "\r\n" is one Newline token, and offsets index the original
-    // bytes, so a diagnostic pointing at 'b' matches the file on disk byte for byte.
+    // The input is tokenized exactly as given: "\r\n" is one Newline token, and offsets index the original bytes, so a
+    // diagnostic pointing at 'b' matches the file on disk byte for byte.
     Token_reader<Kind> reader{build_lexer(), std::string{"a\r\nb"}, skip_trivia};
 
     EXPECT_EQ(reader.next().token().kind(), Kind::Word);
@@ -129,8 +166,8 @@ TEST(Token_reader_test, Windows_newlines_are_one_token_and_offsets_stay_original
 
 TEST(Token_reader_test, A_lone_carriage_return_counts_as_one_newline)
 {
-    // Classic Mac OS line endings: "a\rb" puts 'b' on line 2, exactly as the documented contract says, and a
-    // mixed input counts each style once.
+    // Classic Mac OS line endings: "a\rb" puts 'b' on line 2, exactly as the documented contract says, and a mixed
+    // input counts each style once.
     Token_reader<Kind> reader{build_lexer(), std::string{"a\rb"}, skip_trivia};
 
     EXPECT_EQ(reader.next().token().lexeme(), "a");
@@ -146,13 +183,29 @@ TEST(Token_reader_test, A_lone_carriage_return_counts_as_one_newline)
 
     for (int newlines{0}; newlines < 6; ++newlines)
     {
-        static_cast<void>(mixed.next());
+        std::ignore = mixed.next();
     }
 
     EXPECT_EQ(mixed.next().token().lexeme(), "d");
     EXPECT_EQ(mixed.location().line(), 4U);
     EXPECT_EQ(mixed.location().column(), 1U);
     EXPECT_EQ(mixed.location().offset(), 7U);
+}
+
+TEST(Token_reader_test, A_carriage_return_and_newline_split_between_two_texts_end_one_line)
+{
+    Token_location split{};
+
+    split.advance("a\r");
+    split.advance("\nb");
+
+    Token_location whole{};
+
+    whole.advance("a\r\nb");
+
+    EXPECT_EQ(split.line(), 2U);
+    EXPECT_EQ(split.column(), 2U);
+    EXPECT_EQ(split.position(), whole.position());
 }
 
 TEST(Token_reader_test, Location_tracks_lines_and_columns)
@@ -198,8 +251,8 @@ TEST(Token_reader_test, Location_starts_lines_after_a_newline)
 
 TEST(Token_reader_test, Recover_moves_to_the_next_certified_start_and_keeps_locations_right)
 {
-    // The dollar signs match no token. The first certificate past the failure is the window " t": a space cannot
-    // sit inside a word, so the t after it begins a token in every completely tokenizable context.
+    // The dollar signs match no token. The first certificate past the failure is the window " t": a space cannot sit
+    // inside a word, so the t after it begins a token in every completely tokenizable context.
     Token_reader<Kind> reader{build_lexer(), std::string{"one $\n$ two; three"}, skip_trivia};
 
     EXPECT_EQ(reader.next().token().lexeme(), "one");
@@ -243,6 +296,6 @@ TEST(Token_reader_test, Recover_refuses_to_run_with_a_token_buffered)
     Token_reader<Kind> reader{build_lexer(), std::string{"one two"}, skip_trivia};
 
     EXPECT_EQ(reader.peek().token().lexeme(), "one");
-    EXPECT_THROW(static_cast<void>(reader.recover()), std::logic_error);
+    EXPECT_THROW(std::ignore = reader.recover(), std::logic_error);
     EXPECT_EQ(reader.next().token().lexeme(), "one");
 }

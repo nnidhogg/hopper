@@ -339,16 +339,10 @@ struct Expr
             Assign, Cast>;
 
     /**
-     * @brief The node this expression holds.
-     */
-    /**
      * @brief The expression itself.
      */
     Node_t node;
 
-    /**
-     * @brief The source range this expression was parsed from, including any enclosing parentheses.
-     */
     /**
      * @brief The source range the expression was parsed from.
      */

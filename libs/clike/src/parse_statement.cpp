@@ -12,6 +12,8 @@ namespace hopper::clike
 {
 ast::Stmt Parser::parse_statement()
 {
+    pending_.reset();
+
     auto stmt{parse_statement_node()};
 
     if (more())
@@ -37,7 +39,7 @@ ast::Stmt Parser::parse_statement_node()
     }
 
     // The statements a keyword opens, dispatched by the keyword; each parser expects its own keyword again.
-    static constexpr std::array<std::pair<std::string_view, ast::Stmt (Parser::*)()>, 5> keyworded{{
+    static constexpr std::array<std::pair<std::string_view, ast::Stmt (Parser::*)()>, 5> keyword_statements{{
             {"if", &Parser::parse_if_statement},
             {"while", &Parser::parse_while_statement},
             {"for", &Parser::parse_for_statement},
@@ -45,7 +47,7 @@ ast::Stmt Parser::parse_statement_node()
             {"return", &Parser::parse_return_statement},
     }};
 
-    for (const auto& [word, parse] : keyworded)
+    for (const auto& [word, parse] : keyword_statements)
     {
         if (check_keyword(word))
         {
@@ -72,7 +74,7 @@ ast::Stmt Parser::parse_compound_statement()
 
     expect_punctuation('{', "'{' to open the block");
 
-    std::vector<ast::Stmt> statements;
+    std::vector<ast::Stmt> statements{};
 
     while (!check_punctuation('}'))
     {
@@ -102,7 +104,7 @@ ast::Stmt Parser::parse_if_statement()
 
     auto then_branch{parse_statement_node()};
 
-    std::unique_ptr<ast::Stmt> else_branch;
+    std::unique_ptr<ast::Stmt> else_branch{};
 
     if (accept_keyword("else"))
     {
@@ -148,7 +150,7 @@ ast::Stmt Parser::parse_for_statement()
 
     auto init{parse_for_initializer()};
 
-    std::optional<ast::Expr> condition;
+    std::optional<ast::Expr> condition{};
 
     if (!check_punctuation(';'))
     {
@@ -157,7 +159,7 @@ ast::Stmt Parser::parse_for_statement()
 
     expect_punctuation(';', "';' after the loop condition");
 
-    std::optional<ast::Expr> step;
+    std::optional<ast::Expr> step{};
 
     if (!check_punctuation(')'))
     {
@@ -193,6 +195,17 @@ ast::Stmt Parser::parse_for_initializer()
     }
 
     return parse_expression_statement("the loop initializer");
+}
+
+ast::Stmt Parser::parse_expression_statement(const std::string_view what)
+{
+    const auto begin{here()};
+
+    auto expr{parse_assignment()};
+
+    expect_punctuation(';', "';' after " + std::string{what});
+
+    return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(begin)};
 }
 
 ast::Stmt Parser::parse_do_statement()
@@ -235,17 +248,6 @@ ast::Stmt Parser::parse_return_statement()
     expect_punctuation(';', "';' after the return value");
 
     return {.node = ast::Return{.value = std::move(value)}, .span = close(begin)};
-}
-
-ast::Stmt Parser::parse_expression_statement(const std::string_view what)
-{
-    const auto begin{here()};
-
-    auto expr{parse_assignment()};
-
-    expect_punctuation(';', "';' after " + std::string{what});
-
-    return {.node = ast::Expr_stmt{.expr = std::move(expr)}, .span = close(begin)};
 }
 
 } // namespace hopper::clike

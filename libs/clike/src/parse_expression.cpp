@@ -6,16 +6,60 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <utility>
 #include <vector>
 
-#include "hopper/clike/binary_operator.hpp"
 #include "hopper/clike/parser.hpp"
+#include "hopper/parse/parse_error.hpp"
 
 namespace hopper::clike
 {
 namespace
 {
+/**
+ * @brief A binary operator's place in the precedence ladder and the node it builds.
+ */
+struct Binary_operator
+{
+    /**
+     * @brief The rung on the ladder, one for the loosest binding operator upward.
+     */
+    int precedence;
+
+    /**
+     * @brief The node the operator builds.
+     */
+    ast::Binary_op op;
+};
+
+/**
+ * @brief The binary precedence ladder, C's, left-associative throughout.
+ *
+ * Logical or at 1, logical and at 2, bitwise or, xor and and at 3 to 5, equality at 6, relational at 7, shifts at 8,
+ * additive at 9 and multiplicative at 10.
+ */
+constexpr std::array<std::pair<std::string_view, Binary_operator>, 18> ladder{{
+        {"||", {.precedence = 1, .op = ast::Binary_op::Logical_or}},
+        {"&&", {.precedence = 2, .op = ast::Binary_op::Logical_and}},
+        {"|", {.precedence = 3, .op = ast::Binary_op::Bitwise_or}},
+        {"^", {.precedence = 4, .op = ast::Binary_op::Bitwise_xor}},
+        {"&", {.precedence = 5, .op = ast::Binary_op::Bitwise_and}},
+        {"==", {.precedence = 6, .op = ast::Binary_op::Equal}},
+        {"!=", {.precedence = 6, .op = ast::Binary_op::Not_equal}},
+        {"<", {.precedence = 7, .op = ast::Binary_op::Less}},
+        {">", {.precedence = 7, .op = ast::Binary_op::Greater}},
+        {"<=", {.precedence = 7, .op = ast::Binary_op::Less_equal}},
+        {">=", {.precedence = 7, .op = ast::Binary_op::Greater_equal}},
+        {"<<", {.precedence = 8, .op = ast::Binary_op::Shift_left}},
+        {">>", {.precedence = 8, .op = ast::Binary_op::Shift_right}},
+        {"+", {.precedence = 9, .op = ast::Binary_op::Add}},
+        {"-", {.precedence = 9, .op = ast::Binary_op::Subtract}},
+        {"*", {.precedence = 10, .op = ast::Binary_op::Multiply}},
+        {"/", {.precedence = 10, .op = ast::Binary_op::Divide}},
+        {"%", {.precedence = 10, .op = ast::Binary_op::Modulo}},
+}};
+
 /**
  * @brief The prefix operators, in the order the parser tries them.
  */
@@ -58,26 +102,10 @@ constexpr std::array<std::pair<std::string_view, ast::Cast_kind>, 4> casts{{
 }};
 
 /**
- * @brief Looks a spelling up in one of the tables above.
- * @tparam Table The table's type.
- * @param table The table.
- * @param spelling The spelling looked for.
- * @return The entry's value, or std::nullopt when the spelling is not in the table.
- */
-template <typename Table>
-[[nodiscard]] auto lookup(const Table& table, const std::string_view spelling)
-        -> std::optional<typename Table::value_type::second_type>
-{
-    const auto found{std::ranges::find(table, spelling, &Table::value_type::first)};
-
-    return found != table.end() ? std::optional{found->second} : std::nullopt;
-}
-
-/**
  * @brief The value an integer literal spells, when the platform's integer holds it.
  *
- * Read with std::from_chars rather than a library conversion that throws, so an overflow is the parser's syntax
- * error at the token and not an exception with no position.
+ * Read with std::from_chars rather than a library conversion that throws, so an overflow is the parser's
+ * invalid-literal error at the token and not an exception with no position.
  * @param lexeme The literal's digits.
  * @return The value, or std::nullopt when it is out of range.
  */
@@ -153,6 +181,8 @@ template <typename Table>
 
 ast::Expr Parser::parse_expression()
 {
+    pending_.reset();
+
     auto expr{parse_assignment()};
 
     if (more())
@@ -224,7 +254,7 @@ ast::Expr Parser::parse_binary(const int min_precedence)
     {
         const auto op{peek_operator()};
 
-        const auto info{op ? binary_operator_for(op->spelling) : std::nullopt};
+        const auto info{op ? lookup(ladder, op->spelling) : std::nullopt};
 
         if (!info || info->precedence < min_precedence)
         {
@@ -300,52 +330,6 @@ ast::Expr Parser::parse_postfix()
     }
 }
 
-ast::Expr Parser::parse_call(ast::Expr callee)
-{
-    std::vector<ast::Expr> arguments;
-
-    if (!check_punctuation(')'))
-    {
-        arguments.push_back(parse_assignment());
-
-        while (accept_punctuation(','))
-        {
-            arguments.push_back(parse_assignment());
-        }
-    }
-
-    expect_punctuation(')', "')' to close the argument list");
-
-    return {.node = ast::Call{
-                    .callee = std::make_unique<ast::Expr>(std::move(callee)),
-                    .arguments = std::move(arguments),
-            }};
-}
-
-ast::Expr Parser::parse_subscript(ast::Expr object)
-{
-    auto index{parse_assignment()};
-
-    expect_punctuation(']', "']' to close the subscript");
-
-    return {.node = ast::Subscript{
-                    .object = std::make_unique<ast::Expr>(std::move(object)),
-                    .index = std::make_unique<ast::Expr>(std::move(index)),
-            }};
-}
-
-ast::Expr Parser::parse_member(ast::Expr object, const ast::Member_op op)
-{
-    const auto member{
-            expect_identifier(op == ast::Member_op::Dot ? "a member name after '.'" : "a member name after '->'")};
-
-    return {.node = ast::Member{
-                    .op = op,
-                    .object = std::make_unique<ast::Expr>(std::move(object)),
-                    .member = std::string{member.lexeme()},
-            }};
-}
-
 ast::Expr Parser::parse_primary()
 {
     const auto begin{here()};
@@ -404,7 +388,9 @@ std::optional<ast::Expr> Parser::parse_literal()
 
         if (!value)
         {
-            syntax_error("Integer literal is out of range", *token);
+            throw parse::Parse_error{
+                    parse::Parse_error_kind::Invalid_literal, close(begin),
+                    "Invalid integer: the literal is out of range"};
         }
 
         return ast::Expr{.node = ast::Int_literal{.value = *value}, .span = close(begin)};
@@ -441,7 +427,7 @@ std::optional<ast::Expr> Parser::parse_cast()
 
     const auto begin{here()};
 
-    (void)next_token();
+    std::ignore = next_token();
 
     expect_operator("<", "'<' after the cast keyword");
 
@@ -457,6 +443,52 @@ std::optional<ast::Expr> Parser::parse_cast()
     return ast::Expr{
             .node = ast::Cast{.kind = *kind, .type = type, .operand = std::make_unique<ast::Expr>(std::move(operand))},
             .span = close(begin)};
+}
+
+ast::Expr Parser::parse_call(ast::Expr callee)
+{
+    std::vector<ast::Expr> arguments{};
+
+    if (!check_punctuation(')'))
+    {
+        arguments.push_back(parse_assignment());
+
+        while (accept_punctuation(','))
+        {
+            arguments.push_back(parse_assignment());
+        }
+    }
+
+    expect_punctuation(')', "')' to close the argument list");
+
+    return {.node = ast::Call{
+                    .callee = std::make_unique<ast::Expr>(std::move(callee)),
+                    .arguments = std::move(arguments),
+            }};
+}
+
+ast::Expr Parser::parse_subscript(ast::Expr object)
+{
+    auto index{parse_assignment()};
+
+    expect_punctuation(']', "']' to close the subscript");
+
+    return {.node = ast::Subscript{
+                    .object = std::make_unique<ast::Expr>(std::move(object)),
+                    .index = std::make_unique<ast::Expr>(std::move(index)),
+            }};
+}
+
+ast::Expr Parser::parse_member(ast::Expr object, const ast::Member_op op)
+{
+    const auto member{
+            expect_identifier(op == ast::Member_op::Dot ? "a member name after '.'" : "a member name after '->'")};
+
+    return {.node = ast::Member{
+                    .op = op,
+                    .object = std::make_unique<ast::Expr>(std::move(object)),
+                    .member = std::string{member.lexeme()},
+            }};
 }
 
 } // namespace hopper::clike

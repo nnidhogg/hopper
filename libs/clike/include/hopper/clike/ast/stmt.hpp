@@ -45,8 +45,7 @@ struct Compound
 /**
  * @brief An `if` statement with an optional `else` branch.
  *
- * `else_branch` is null when there is no `else`. A dangling `else` binds to the nearest unmatched `if`, as in
- * real C++.
+ * `else_branch` is null when there is no `else`. A dangling `else` binds to the nearest unmatched `if`, as in real C++.
  */
 struct If
 {
@@ -86,8 +85,8 @@ struct While
  * @brief A `for` loop.
  *
  * `init` is always present and holds what stood before the first semicolon: a Declaration, an Expr_stmt, or Empty,
- * mirroring the C++ grammar's init-statement. `condition` and `step` are absent when their slots were left empty,
- * as in `for (;;)`.
+ * mirroring the C++ grammar's init-statement. `condition` and `step` are absent when their slots were left empty, as in
+ * `for (;;)`.
  */
 struct For
 {
@@ -150,16 +149,10 @@ struct Stmt
     using Node_t = std::variant<Expr_stmt, Empty, Compound, If, While, For, Do_while, Return, Declaration>;
 
     /**
-     * @brief The node this statement holds.
-     */
-    /**
      * @brief The statement itself.
      */
     Node_t node;
 
-    /**
-     * @brief The source range this statement was parsed from.
-     */
     /**
      * @brief The source range the statement was parsed from.
      */

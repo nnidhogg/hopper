@@ -10,8 +10,8 @@
 
 `hopper` is a **C++23 library** for building **recursive-descent parsers** on top of
 **[`munch`](https://github.com/nnidhogg/munch)** lexers. It supplies the parts every hand-written parser repeats and
-nothing else: a **token stream with one token of lookahead** that discards trivia, **source tracking** so every node
-carries the span it was parsed from with offsets indexing the original bytes, **structured errors** with a kind and
+nothing else: a **token stream with one token of lookahead** that discards trivia, **source tracking** so a parser can
+give a node the span it was parsed from, with offsets indexing the original bytes, **structured errors** with a kind and
 the span they point at, and **certified recovery** after a lexical error, inherited from munch under munch's own
 contract. A grammar is a class that derives from the kit and writes its productions as methods; there is no grammar
 language, no generated code and no runtime table.
@@ -22,13 +22,12 @@ JSONTestSuite, parsed with an explicit stack so nesting depth is bounded by memo
 keywords and multi-byte operators out of the campaign's coarse tokens the way a C lexer would have, so a parser over the
 measured grammar exists beside the measurements.
 
-## **Status: pre-1.0**
+## **Status**
 
-The kit is stable in shape and used by both grammars; the public names may still change before 1.0, after which the
-versioning rule is munch's, additive within a major version. What is not here yet is the parser-level half of
-certified resumption: after a lexical error the kit moves the stream to munch's next certified token start, and what
-a parser may assume about its own state at that point is the open question the JSON grammar was chosen to ask; see
-[docs/design.md](docs/design.md).
+The kit and the two grammars are complete for what they claim, the suite is held to the JSONTestSuite and to the
+campaign grammar, and the public names below are the ones 1.0 fixes. What is deliberately outside 1.x is a parser-level
+policy after recovery: the kit moves the stream to munch's next certified token start, and what a parser may assume
+about its own state there is a question this library asks and does not answer; see [docs/design.md](docs/design.md).
 
 ## **Features**
 
@@ -36,10 +35,11 @@ a parser may assume about its own state at that point is the open question the J
   lookahead, a skip predicate for trivia, and locations that count `"\r\n"` and a lone `'\r'` as one newline each while
   offsets index the original bytes.
 - **A parser base with the operations a recursive-descent parser repeats.** `parse::Parser_base<Kind>` gives peek,
-  check, accept and expect over token kinds, `mark()` and `span_from()` to close a node's span, and three error raisers
-  whose messages name what was expected.
-- **Structured errors.** `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an
-  invalid literal, and the source span it points at, with line, column and byte offset.
+  check, accept and expect over token kinds, `mark()` and `span_from()` to close a node's span, and error raisers: a
+  syntax error and an unexpected end whose messages name what was expected, and a lexical error that carries the
+  tokenizer's message.
+- **Structured errors.** `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, an
+  invalid literal or an unreadable input file, and the source span it points at, with line, column and byte offset.
 - **Certified recovery.** `Parser_base::recover()` moves the stream past a lexical error to the next token start munch
   certifies, under complete-repair invariance: in every completely tokenizable repair of the text before the returned
   evidence, the answer begins a token. No repair is promised to exist, the next read may error again, and a call with a
@@ -50,9 +50,10 @@ a parser may assume about its own state at that point is the open question the J
   string interior is built from munch's UTF-8 code point ranges, so a string that is not well-formed UTF-8 never
   tokenizes.
 - **Edits that relex only what they reach.** `json::Document` keeps a text and its token stream and brings the stream
-  current after an edit by rescanning from the last certified token start before it to the first boundary after it that
-  the old stream shared, the edit theorem of the certified-splitting report as a type; every edit reports how many bytes
-  it reread.
+  current after an edit by rescanning from a certified token start close before it, found by a bounded search, to the
+  first boundary after it that the old stream shared, or by relexing the whole text when that search finds no certified
+  start or the text does not tokenize, the edit theorem of the certified-splitting report as a type; every edit reports
+  how many bytes its scan covered.
 - **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over the campaign's
   seven token kinds; its language is decimal integers, strings without escapes, booleans, the C operator ladder with
   assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types with
@@ -88,7 +89,7 @@ int main()
         // Every value knows where it came from: byte offsets into the original text, and a line and column.
         const auto& stable{object.at("stable")};
 
-        std::cout << "stable spans bytes " << stable.span.begin.offset << " to " << stable.span.end.offset << '\n';
+        std::cout << "stable spans bytes " << stable.span().begin.offset << " to " << stable.span().end.offset << '\n';
     }
     catch (const hopper::parse::Parse_error& error)
     {
@@ -104,11 +105,11 @@ and recovering after a lexical error are documented in [docs/usage.md](docs/usag
 
 ### **Requirements**
 
-- A C++23 compiler; GCC and Clang on Linux are the toolchains built and tested (GCC 13.3 and Clang 19 in CI), on
-  x86-64 and 64-bit ARM. Clang 18 and older cannot compile munch's tokenizer, which every hopper parser reads through.
-- CMake 3.20+.
-- munch as the git submodule under `external/munch`, checked out at the release hopper builds against; googletest
-  beside it for the tests. Everything else is the standard library.
+- A C++23 compiler; GCC and Clang on Linux are the toolchains built and tested (GCC 13.3 and Clang 19 in CI), on x86-64
+  and 64-bit ARM. Clang 18 and older cannot compile munch's tokenizer, which every hopper parser reads through.
+- CMake 3.20.6 or later.
+- munch as the git submodule under `external/munch`, checked out at the release hopper builds against; googletest beside
+  it for the tests. Everything else is the standard library.
 
 ### **Building the Project**
 
@@ -128,8 +129,9 @@ The library is documented in `docs/`, one page per subject; the README is the en
 - [docs/usage.md](docs/usage.md): consuming hopper from CMake; parsing JSON and the C-like study grammar; writing a
   grammar of your own on the kit; editing a JSON text with the token stream kept current; recovering after a lexical
   error.
-- [docs/how_it_works.md](docs/how_it_works.md): the layers from munch's automaton to a grammar's tree, and where each
-  lives in the tree.
+- [docs/how_it_works.md](docs/how_it_works.md): a token's path from munch's automaton to a grammar's tree; how
+  positions, spans and errors are kept; the JSON parser's explicit stack; the four steps of an incremental edit; the
+  C-like parser's operator fusion; and where each piece lives in the tree.
 - [docs/design.md](docs/design.md): the decisions behind the kit and the two grammars, the edit theorem as a type with
   its measured figures, and the open question the JSON grammar was chosen to ask.
 
@@ -142,20 +144,43 @@ cd build
 ctest --output-on-failure
 ```
 
-The JSON suite includes the 318 parsing cases of the JSONTestSuite, vendored under
-`libs/json/tests/data/JSONTestSuite/` with their licence and provenance: every `y_` case must parse, every `n_` case
-must be refused, and what the parser does on the `i_` cases is asserted rather than left to drift. Tests and
-warnings-as-errors are enabled by default only when hopper is the top-level project; a build consuming hopper through
-`add_subdirectory` opts in with `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`. The probe under `tools/probes/`
-is a self-checking executable registered with CTest as well; given a JSON file it prints the edit figures instead.
+The JSON suite includes the 318 parsing cases of the JSONTestSuite, vendored under `libs/json/tests/data/JSONTestSuite/`
+with their licence and provenance: every `y_` case must parse, every `n_` case must be refused, and what the parser does
+on the `i_` cases is asserted rather than left to drift. Tests and warnings-as-errors are enabled by default only when
+hopper is the top-level project; a build consuming hopper through `add_subdirectory` opts in with
+`-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`. The probe under `tools/probes/` is a self-checking executable
+registered with CTest as well; given a JSON file it prints the edit figures instead.
+
+Two libFuzzer harnesses under `tools/fuzz/` feed arbitrary bytes to the JSON and C-like parsers; a `Parse_error` is the
+parser's answer to malformed input, and a crash, a sanitizer report or a hang is a finding. They build in a dedicated
+tree configured with Clang and `-DHOPPER_BUILD_FUZZER=ON`, which instruments the whole tree, the munch submodule
+included, and CI runs each for a bounded minute on every push to master and every pull request against it.
 
 ## **Versioning and Stability**
 
-hopper is pre-1.0: the kit's public names, `parse::Token_reader`, `parse::Parser_base`, `parse::Parse_error`,
-`parse::Source_span` and their members, and the two grammars' `Parser` and tree types may still change before 1.0.
-From 1.0 the rule is munch's: a minor release adds and never removes or renames on the stable surface named here,
-and a major release is the only place a name disappears. The munch submodule is pinned to a release, and a hopper
-release names the munch release it was built and tested against.
+hopper follows semantic versioning, munch's rule: a minor release adds and never removes or renames on the stable
+surface, and a major release is the only place a name disappears. The stable surface is what this README and
+[docs/usage.md](docs/usage.md) document. In the kit: `parse::Token_reader<Kind>` with `load()`, `reset()`, `recover()`,
+its `Token_lookahead` and its locations, `parse::Parser_base<Kind>` with `peek_token()`, `next_token()`, `check()`,
+`accept()`, `expect()`, `require()`, `consume()`, `mark()`, `span_from()` and its error raisers, `parse::Parse_error`
+with `Parse_error_kind`, `parse::Source_position`, `parse::Source_span` and `parse::Token_location`. In the grammars:
+`json::Parser`, `json::Value` with `Null`, `Number`, `Array`, `Object` and `Member`, `json::Document` with `Piece` and
+`Relex`, `clike::Parser` with its `ast` types, and each grammar's `Token_kind`, `lexer()` and `is_trivia()`. Everything
+under `hopper::parse` is the kit and changes only by addition within a major version; the grammars are reference front
+ends and follow the same rule, a new production or node arriving in a minor version.
+
+**Errors.** A parser fails fast: malformed input raises `parse::Parse_error` with its kind and the span it points at,
+and nothing is repaired or guessed. Recovery is explicit and lexical, `Parser_base::recover()` under munch's
+complete-repair invariance, and what a grammar does with a resumed stream is that grammar's policy; the kit promises no
+syntactic recovery in 1.x. Precondition violations, such as `recover()` with a token buffered, throw `std::logic_error`.
+Nesting is bounded by memory in the JSON parser, which keeps an explicit stack, and in destroying a `json::Value`.
+Copying and comparing a value recurse through its tree, so their depth is bounded by the call stack, as is the C-like
+parser's, which is recursive.
+
+**Platforms.** The promise is munch's: 64-bit Linux with GCC 13 or later and Clang 19 or later, source compatibility
+within a major version and no ABI promise. CI builds and tests on x86-64 and ARM64 and sanitizes and fuzzes on x86-64.
+The munch submodule is pinned to a release, and a hopper release names the munch release it was built and tested
+against.
 
 ## **License**
 

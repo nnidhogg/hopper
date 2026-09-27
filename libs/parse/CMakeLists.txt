@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.20.6)
 cmake_policy(SET CMP0097 NEW)
 project(hopper_parse)
 
-include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME}
         src/parse_error.cpp
         src/token_location.cpp
+        src/token_reader.cpp
 )
 
 # The exported target carries the standard it needs.
@@ -34,7 +34,7 @@ if (HOPPER_BUILD_TESTS)
             PRIVATE
             ${PROJECT_NAME}
             munch::munch
-            gtest_main
+            GTest::gtest_main
     )
 
     add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)

@@ -1,6 +1,7 @@
 #ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_PARSER_HPP
 #define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_PARSER_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
@@ -23,23 +24,18 @@ namespace hopper::clike
  *
  * The lexer delivers the campaign's tokens and nothing finer, so the parser recognizes what a C lexer would have:
  * keywords are identifiers with a reserved spelling, and a multi-byte operator is a run of adjacent operator bytes,
- * fused by the longest spelling the operator table knows, which is maximal munch applied one level up. The language
- * is the study grammar's: decimal integers, strings without escapes, booleans, the C operator set, the fundamental
- * types with const, pointers and references, and the statements a C body is made of.
+ * fused by the longest spelling the operator table knows, which is maximal munch applied one level up. The language is
+ * the study grammar's: decimal integers, strings without escapes, booleans, the C operator set, the fundamental types
+ * with const, pointers and references, and the statements a C body is made of.
  */
 class Parser : public parse::Parser_base<Token_kind>
 {
 public:
     /**
-     * @brief The token reader type this parser consumes.
-     */
-    using Token_reader_t = parse::Token_reader<Token_kind>;
-
-    /**
      * @brief Constructs a parser over a prepared reader.
      * @param reader The reader, whose lexer is expected to be lexer() with trivia discarded.
      */
-    explicit Parser(Token_reader_t reader);
+    explicit Parser(Reader_t reader);
 
     /**
      * @brief Constructs a parser over a text held in memory, using lexer() and discarding trivia.
@@ -54,18 +50,10 @@ public:
     explicit Parser(const std::filesystem::path& file);
 
     /**
-     * @brief The base's input replacement, rewind and lexical recovery, made public: they are the parser's whole
-     *        contract for reading many inputs and resuming after a lexical error.
-     */
-    using parse::Parser_base<Token_kind>::load;
-    using parse::Parser_base<Token_kind>::reset;
-    using parse::Parser_base<Token_kind>::recover;
-
-    /**
      * @brief Parses the whole input as one expression.
      * @return The expression tree.
-     * @throws parse::Parse_error On a lexical error, a token out of place, an input ending inside the expression,
-     *         or input left after it.
+     * @throws parse::Parse_error On a lexical error, a token out of place, an integer literal the platform's integer
+     *         cannot hold, an input ending inside the expression, or input left after it.
      */
     [[nodiscard]] ast::Expr parse_expression();
 
@@ -109,21 +97,23 @@ private:
     };
 
     /**
-     * @brief The pointer stars and the optional reference that follow a type or open a declarator, read the same way
-     *        wherever they occur.
+     * @brief Looks a spelling up in a constexpr table of spelling and value pairs.
+     *
+     * The parser's type and operator tables are all such pairs, so one lookup serves them, and the value type follows
+     * the table.
+     * @tparam Table The table's type, a range of std::pair<std::string_view, Value>.
+     * @param table The table.
+     * @param spelling The spelling looked for.
+     * @return The entry's value, or std::nullopt when the spelling is not in the table.
      */
-    struct Indirection
+    template <typename Table>
+    [[nodiscard]] static auto lookup(const Table& table, const std::string_view spelling) noexcept
+            -> std::optional<typename Table::value_type::second_type>
     {
-        /**
-         * @brief How many stars.
-         */
-        std::size_t pointers;
+        const auto found{std::ranges::find(table, spelling, &Table::value_type::first)};
 
-        /**
-         * @brief Whether an ampersand follows them.
-         */
-        bool reference;
-    };
+        return found != table.end() ? std::optional{found->second} : std::nullopt;
+    }
 
     /**
      * @brief Where the next token begins, the fused operator included.
@@ -142,8 +132,8 @@ private:
      * @brief The operator at the current position, fused to its longest spelling, or nothing when the current token
      *        is not an operator byte.
      *
-     * Adjacent operator bytes are joined while the joined spelling is a prefix of an operator the table knows, so
-     * `<<=` is one operator and `a+-b` is `a + (-b)`; the result is kept as the current token until consumed.
+     * Adjacent operator bytes are joined while the joined spelling is a prefix of an operator the table knows, so `<<=`
+     * is one operator and `a+-b` is `a + (-b)`; the result is kept as the current token until consumed.
      * @return The fused operator.
      */
     [[nodiscard]] std::optional<Operator> peek_operator();
@@ -173,6 +163,12 @@ private:
      * @param what What the grammar expected, named in the error.
      */
     void expect_operator(std::string_view spelling, std::string_view what);
+
+    /**
+     * @brief Raises the syntax error for the current token, whatever its kind, naming what was expected.
+     * @param what What the grammar expected, named in the error.
+     */
+    [[noreturn]] void unexpected(std::string_view what);
 
     /**
      * @brief Whether the current token is the punctuation byte.
@@ -227,19 +223,13 @@ private:
      * @param what What the grammar expected, named in the error.
      * @return The token.
      */
-    Token_t expect_identifier(std::string_view what);
+    [[nodiscard]] Token_t expect_identifier(std::string_view what);
 
     /**
      * @brief Whether input remains, the fused operator included.
      * @return True while something is left to read.
      */
     [[nodiscard]] bool more();
-
-    /**
-     * @brief Raises the syntax error for the current token, whatever its kind, naming what was expected.
-     * @param what What the grammar expected, named in the error.
-     */
-    [[noreturn]] void unexpected(std::string_view what);
 
     /**
      * @brief Parses an assignment expression: a conditional expression, optionally assigned to with one of the
@@ -271,11 +261,34 @@ private:
     /**
      * @brief Parses a primary expression followed by calls, subscripts, member accesses and postfix increments.
      *
-     * Every suffix wraps what stands before it, so the loop hands the expression built so far to the suffix and
-     * closes the result's span from where the primary began, whichever suffix it was.
+     * Every suffix wraps what stands before it, so the loop hands the expression built so far to the suffix and closes
+     * the result's span from where the primary began, whichever suffix it was.
      * @return The expression.
      */
     [[nodiscard]] ast::Expr parse_postfix();
+
+    /**
+     * @brief Parses a literal, a name, a named cast or a parenthesized expression, or raises the error naming what
+     *        was expected.
+     * @return The expression.
+     */
+    [[nodiscard]] ast::Expr parse_primary();
+
+    /**
+     * @brief Parses an integer or string literal, when one stands at the current position.
+     *
+     * A fused operator is never a literal, so the check happens before the reader is consulted; a number the platform's
+     * integer cannot hold is an invalid literal at the token rather than a value silently wrapped.
+     * @return The literal, or nothing when the current token is not one.
+     */
+    [[nodiscard]] std::optional<ast::Expr> parse_literal();
+
+    /**
+     * @brief Parses a named cast, `static_cast<type>(operand)` and its three siblings, when one stands at the
+     *        current position.
+     * @return The cast, or nothing when the current token is not a cast keyword.
+     */
+    [[nodiscard]] std::optional<ast::Expr> parse_cast();
 
     /**
      * @brief Parses the argument list of a call whose `(` is consumed, and wraps the callee in the call.
@@ -298,29 +311,6 @@ private:
      * @return The member access, its span unset.
      */
     [[nodiscard]] ast::Expr parse_member(ast::Expr object, ast::Member_op op);
-
-    /**
-     * @brief Parses a literal, a name, a named cast or a parenthesized expression, or raises the error naming what
-     *        was expected.
-     * @return The expression.
-     */
-    [[nodiscard]] ast::Expr parse_primary();
-
-    /**
-     * @brief Parses an integer or string literal, when one stands at the current position.
-     *
-     * A fused operator is never a literal, so the check happens before the reader is consulted; a number the
-     * platform's integer cannot hold is a syntax error at the token rather than a value silently wrapped.
-     * @return The literal, or nothing when the current token is not one.
-     */
-    [[nodiscard]] std::optional<ast::Expr> parse_literal();
-
-    /**
-     * @brief Parses a named cast, `static_cast<type>(operand)` and its three siblings, when one stands at the
-     *        current position.
-     * @return The cast, or nothing when the current token is not a cast keyword.
-     */
-    [[nodiscard]] std::optional<ast::Expr> parse_cast();
 
     /**
      * @brief Parses one statement of any kind, the compound statement and the declaration included.
@@ -361,6 +351,13 @@ private:
     [[nodiscard]] ast::Stmt parse_for_initializer();
 
     /**
+     * @brief Parses an expression followed by `;`.
+     * @param what What the `;` follows, named in the error when it is missing.
+     * @return The expression statement.
+     */
+    [[nodiscard]] ast::Stmt parse_expression_statement(std::string_view what);
+
+    /**
      * @brief Parses a do/while statement.
      * @return The statement.
      */
@@ -371,13 +368,6 @@ private:
      * @return The statement.
      */
     [[nodiscard]] ast::Stmt parse_return_statement();
-
-    /**
-     * @brief Parses an expression followed by `;`.
-     * @param what What the `;` follows, named in the error when it is missing.
-     * @return The expression statement.
-     */
-    [[nodiscard]] ast::Stmt parse_expression_statement(std::string_view what);
 
     /**
      * @brief Whether the current token opens a declaration: `const` or a fundamental type name.
@@ -398,22 +388,16 @@ private:
     [[nodiscard]] ast::Type parse_type_specifier();
 
     /**
-     * @brief Parses a type specifier followed by its indirection, as a cast names its type.
-     * @return The type id.
+     * @brief Parses a declarator: its indirection, a name and an optional initializer.
+     * @return The declarator.
      */
-    [[nodiscard]] ast::Type_id parse_type_id();
+    [[nodiscard]] ast::Declarator parse_declarator();
 
     /**
      * @brief Parses pointer stars and an optional reference, both possibly absent.
      * @return What was read.
      */
-    [[nodiscard]] Indirection parse_indirection();
-
-    /**
-     * @brief Parses a declarator: its indirection, a name and an optional initializer.
-     * @return The declarator.
-     */
-    [[nodiscard]] ast::Declarator parse_declarator();
+    [[nodiscard]] ast::Indirection parse_indirection();
 
     /**
      * @brief Parses `=` and an assignment expression when the current token is `=`.
@@ -422,10 +406,16 @@ private:
     [[nodiscard]] std::optional<ast::Expr> parse_initializer();
 
     /**
+     * @brief Parses a type specifier followed by its indirection, as a cast names its type.
+     * @return The type id.
+     */
+    [[nodiscard]] ast::Type_id parse_type_id();
+
+    /**
      * @brief Parses one item of a translation unit: a declaration, or a function prototype or definition.
      *
-     * The two share their head, a type, an indirection and a name, and part at the next token: `(` opens a
-     * function, anything else continues a declaration whose first declarator is the head already read.
+     * The two share their head, a type, an indirection and a name, and part at the next token: `(` opens a function,
+     * anything else continues a declaration whose first declarator is the head already read.
      * @return The item's node.
      */
     [[nodiscard]] ast::Translation_unit::Item::Node_t parse_external_declaration();
@@ -437,7 +427,7 @@ private:
      * @param name The function's name.
      * @return The function.
      */
-    [[nodiscard]] ast::Function parse_function(ast::Type type, Indirection indirection, std::string name);
+    [[nodiscard]] ast::Function parse_function(ast::Type type, ast::Indirection indirection, std::string name);
 
     /**
      * @brief Parses one parameter: a type, its indirection, an optional name and an optional default.
@@ -447,6 +437,9 @@ private:
 
     /**
      * @brief The fused operator standing as the current token, or nothing.
+     *
+     * Every parse begins by clearing it, so neither a parse that threw nor a load() or reset() before the next parse
+     * leaves an operator of the old input standing.
      */
     std::optional<Operator> pending_;
 };

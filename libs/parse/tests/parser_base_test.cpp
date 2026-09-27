@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include <munch/core/builder.hpp>
@@ -15,7 +16,10 @@ using namespace hopper::parse;
 
 namespace
 {
-enum class Kind : uint8_t
+/**
+ * @brief The token kinds of the test grammar: words, numbers, the trivia and the separators.
+ */
+enum class Kind : std::uint8_t
 {
     Word,
     Number,
@@ -23,16 +27,25 @@ enum class Kind : uint8_t
     Semicolon,
 };
 
+/**
+ * @brief The kinds the reader discards: whitespace alone.
+ * @param kind The kind asked about.
+ * @return True for whitespace.
+ */
 bool skip_trivia(const Kind kind)
 {
     return kind == Kind::Whitespace;
 }
 
+/**
+ * @brief Compiles the test grammar.
+ * @return The lexer.
+ */
 munch::core::Lexer build_lexer()
 {
     using namespace munch::regex;
 
-    munch::core::Builder builder;
+    munch::core::Builder builder{};
 
     builder.add_token(plus(any_of(Set::alpha())), Kind::Word, 1);
     builder.add_token(plus(any_of(Set::digits())), Kind::Number, 1);
@@ -85,7 +98,7 @@ TEST(Parser_base_test, Expect_returns_the_token_or_throws)
 
     EXPECT_EQ(parser.expect(Kind::Word, "a word").lexeme(), "word");
 
-    EXPECT_THROW(static_cast<void>(parser.expect(Kind::Word, "another word")), std::runtime_error);
+    EXPECT_THROW(std::ignore = parser.expect(Kind::Word, "another word"), Parse_error);
 }
 
 TEST(Parser_base_test, Expect_names_the_offending_token)
@@ -94,14 +107,14 @@ TEST(Parser_base_test, Expect_names_the_offending_token)
 
     try
     {
-        static_cast<void>(parser.expect(Kind::Word, "a word"));
+        std::ignore = parser.expect(Kind::Word, "a word");
 
         FAIL() << "expect() should have thrown";
     }
-    catch (const std::runtime_error& error)
+    catch (const Parse_error& error)
     {
         EXPECT_NE(std::string{error.what()}.find("a word"), std::string::npos);
-        EXPECT_NE(std::string{error.what()}.find('1'), std::string::npos);
+        EXPECT_NE(std::string{error.what()}.find("got '1'"), std::string::npos);
     }
 }
 
@@ -117,7 +130,7 @@ TEST(Parser_base_test, Lexical_errors_become_exceptions)
 {
     Test_parser parser{"@"};
 
-    EXPECT_THROW(static_cast<void>(parser.next_token()), std::runtime_error);
+    EXPECT_THROW(std::ignore = parser.next_token(), Parse_error);
 }
 
 TEST(Parser_base_test, Errors_carry_their_kind_and_span)
@@ -126,7 +139,7 @@ TEST(Parser_base_test, Errors_carry_their_kind_and_span)
 
     try
     {
-        static_cast<void>(parser.expect(Kind::Number, "a number"));
+        std::ignore = parser.expect(Kind::Number, "a number");
 
         FAIL() << "expect() should have thrown";
     }
@@ -143,11 +156,11 @@ TEST(Parser_base_test, End_of_input_errors_point_past_the_last_token)
 {
     Test_parser parser{"word"};
 
-    static_cast<void>(parser.next_token());
+    std::ignore = parser.next_token();
 
     try
     {
-        static_cast<void>(parser.expect(Kind::Word, "another word"));
+        std::ignore = parser.expect(Kind::Word, "another word");
 
         FAIL() << "expect() should have thrown";
     }
@@ -163,11 +176,11 @@ TEST(Parser_base_test, Lexical_errors_point_at_the_rejected_input)
 {
     Test_parser parser{"ok @"};
 
-    static_cast<void>(parser.next_token());
+    std::ignore = parser.next_token();
 
     try
     {
-        static_cast<void>(parser.next_token());
+        std::ignore = parser.next_token();
 
         FAIL() << "next_token() should have thrown";
     }
@@ -186,7 +199,7 @@ TEST(Parser_base_test, Recover_resumes_at_the_certified_start_after_a_lexical_er
 
     try
     {
-        static_cast<void>(parser.peek_token());
+        std::ignore = parser.peek_token();
         FAIL() << "peek_token() should have thrown";
     }
     catch (const Parse_error& error)

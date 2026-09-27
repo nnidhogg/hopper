@@ -29,22 +29,22 @@ void Token_location::reset() noexcept
 
 void Token_location::advance(const std::string_view lexeme) noexcept
 {
-    // "\r\n" counts as one newline, and a lone '\r' counts as one too, so line and column stay right on any
-    // platform's line endings while offsets keep indexing the original bytes.
-    for (std::size_t index{0}; index < lexeme.size(); ++index)
+    // A '\r' ends a line at once, and a '\n' ends one unless it completes a "\r\n" pair, whose line its '\r' already
+    // ended, even when the pair is split between two calls.
+    for (const auto c : lexeme)
     {
-        const auto c{lexeme[index]};
-
-        if (c == '\n' || (c == '\r' && (index + 1 == lexeme.size() || lexeme[index + 1] != '\n')))
+        if (c == '\r' || (c == '\n' && !after_carriage_return_))
         {
             ++line_;
 
             column_ = 1;
         }
-        else if (c != '\r')
+        else if (c != '\n')
         {
             ++column_;
         }
+
+        after_carriage_return_ = c == '\r';
     }
 
     offset_ += lexeme.size();

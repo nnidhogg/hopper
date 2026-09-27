@@ -15,6 +15,7 @@ endif ()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # hopper's own root for test data paths; CMAKE_SOURCE_DIR names the embedding project's root under add_subdirectory().
 set(HOPPER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -36,6 +37,7 @@ add_compile_options(
 
 # Developer-only targets stay out of consumer builds.
 option(HOPPER_BUILD_TESTS "Build tests for hopper" ${HOPPER_IS_TOP_LEVEL})
+option(USE_SYSTEM_GTEST "Use an installed googletest found with find_package instead of fetching it" OFF)
 if (HOPPER_BUILD_TESTS)
     enable_testing()
 endif ()
@@ -63,9 +65,13 @@ if (HOPPER_INSTALL AND NOT HOPPER_SYSTEM_MUNCH)
 endif ()
 
 # Found here rather than under external/, because imported targets are visible only from the directory that finds
-# them downward, and every library under libs/ links munch.
+# them downward: every library under libs/ links munch, and every test beside them googletest.
 if (HOPPER_SYSTEM_MUNCH)
     find_package(munch REQUIRED)
+endif ()
+
+if (HOPPER_BUILD_TESTS AND USE_SYSTEM_GTEST)
+    find_package(GTest 1.12 REQUIRED CONFIG)
 endif ()
 
 add_subdirectory(external)

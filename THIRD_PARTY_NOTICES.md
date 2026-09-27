@@ -2,9 +2,9 @@
 
 ## JSONTestSuite
 
-The parsing cases under `libs/json/tests/data/JSONTestSuite/test_parsing/` are copied unchanged from Nicolas
-Seriot's JSONTestSuite (https://github.com/nst/JSONTestSuite) and are used under the MIT License, which follows;
-the copy's provenance is recorded beside the files.
+The parsing cases under `libs/json/tests/data/JSONTestSuite/test_parsing/` are copied unchanged from Nicolas Seriot's
+JSONTestSuite (https://github.com/nst/JSONTestSuite) and are used under the MIT License, which follows; the copy's
+provenance is recorded beside the files.
 
     MIT License
 

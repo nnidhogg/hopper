@@ -44,7 +44,7 @@ int main()
         // Every value knows where it came from: byte offsets into the original text, and a line and column.
         const auto& stable{object.at("stable")};
 
-        std::cout << "stable spans bytes " << stable.span.begin.offset << " to " << stable.span.end.offset << '\n';
+        std::cout << "stable spans bytes " << stable.span().begin.offset << " to " << stable.span().end.offset << '\n';
     }
     catch (const hopper::parse::Parse_error& error)
     {
@@ -55,9 +55,9 @@ int main()
 
 `parse()` accepts exactly one JSON text with nothing but whitespace around it, and raises a `Parse_error` whose kind
 says what went wrong: `Lexical` for bytes no token covers, a control character inside a string or an ill-formed UTF-8
-sequence; `Unexpected_token` for a token out of place, trailing text included; `Unexpected_end` for an input that
-ends inside a value; `Invalid_literal` for a `\u` escape that leaves a surrogate unpaired. Numbers are kept as the
-document spelled them; `Number::to_double()` gives the nearest double, an infinity past the double range.
+sequence; `Unexpected_token` for a token out of place, trailing text included; `Unexpected_end` for an input that ends
+inside a value; `Invalid_literal` for a `\u` escape that leaves a surrogate unpaired. Numbers are kept as the document
+spelled them; `Number::to_double()` gives the nearest double, an infinity past the double range.
 
 ## **Parsing the C-like grammar**
 
@@ -69,9 +69,10 @@ hopper::clike::Parser parser{std::string{"int total = (a << 2) + b[i] * -c;"}};
 const auto statement{parser.parse_statement()};
 ```
 
-`parse_expression()`, `parse_statement()` and `parse_translation_unit()` each parse the whole input as one construct
-and refuse anything left over. The trees are plain structs under `hopper::clike::ast`, one `std::variant` per node
-family, each node carrying its span.
+`parse_expression()`, `parse_statement()` and `parse_translation_unit()` each parse the whole input as one construct and
+refuse anything left over. The trees are plain structs under `hopper::clike::ast`, one `std::variant` per node family;
+expressions, statements and the translation unit's items carry their spans, and types, declarators, parameters and the
+unit itself carry none.
 
 ## **Writing a grammar on the kit**
 
@@ -83,7 +84,7 @@ class Parser : public hopper::parse::Parser_base<Token_kind>
 {
 public:
     explicit Parser(const std::string& input)
-        : Parser_base{hopper::parse::Token_reader<Token_kind>{lexer(), input, is_trivia}}
+        : Parser_base{lexer(), input, is_trivia}
     {}
 
     Node parse_pair()
@@ -98,13 +99,14 @@ public:
 ```
 
 The base's `check(kind)`, `accept(kind)` and `expect(kind, what)` look at the next token; `syntax_error(message,
-token)`, `eof_error(message)` and `lexical_error(message)` raise the three error kinds with the right span. Both
-shipped grammars are written this way and are the reference for the style.
+token)`, `eof_error(message)` and `lexical_error(message)` raise the three error kinds, `syntax_error()` at the current
+token's span, which the token passed to it must be. Both shipped grammars are written this way and are the reference for
+the style.
 
 ## **Editing a JSON text**
 
-`json::Document` holds a text and its token stream, whitespace included, and keeps the stream current across edits by
-relexing between certified positions rather than from the start:
+`json::Document` holds a text and its token stream, whitespace included, and keeps the stream current across edits,
+relexing from a certified position before an edit rather than from the start where a bounded search finds one:
 
 ```cpp
 #include <hopper/json/document.hpp>
@@ -113,20 +115,22 @@ hopper::json::Document document{R"({"a": [1, 2, 3], "b": "text"})"};
 
 const auto relex{document.edit(10, 1, "22")};    // replace one byte at offset 10 with "22"
 
-// relex.rescanned is the bytes reread, a handful here; relex.whole is false unless the document had to start over.
+// relex.rescanned is the bytes the scan covered, a handful here; relex.whole is false unless the document had to start over.
 // document.tokens() now equals the stream of the edited text tokenized whole.
 ```
 
-The scan restarts at the last certified token start whose evidence the edit left untouched, since munch's certificate
-promises a boundary there in every completely tokenizable text agreeing on that evidence, and stops at the first
-boundary after the edit that the old stream also had. An edit that leaves the text incompletely tokenizable relexes
-the whole text, and so does every edit through the one that repairs it. The saving on a real document is measured by
-`tools/probes/hopper_edit_relex` and quoted in [docs/design.md](design.md).
+The scan restarts at a certified token start close before the edit whose evidence the edit left untouched, found by a
+bounded search, since munch's certificate promises a boundary there in every completely tokenizable text agreeing on
+that evidence, and stops at the first boundary after the edit that the old stream also had, a shared token boundary that
+need not be certified. Where the search finds no certified start, as when the 3 of `[1, 2, 3]` becomes a 4, the edit
+relexes the whole text; an edit that leaves the text incompletely tokenizable does the same, and so does every edit
+through the one that repairs it. The saving on a real document is measured by `tools/probes/hopper_edit_relex` and
+quoted in [docs/design.md](design.md).
 
 ## **Error Recovery**
 
-After a `Parse_error` of kind `Lexical`, the stream stands at the failing byte with nothing buffered, and
-`recover()` asks munch for the next certified token start:
+After a `Parse_error` of kind `Lexical`, the stream stands at the failing byte with nothing buffered, and `recover()`
+asks munch for the next certified token start:
 
 ```cpp
 try

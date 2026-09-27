@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "hopper/json/parser.hpp"
@@ -19,7 +20,7 @@ std::vector<std::filesystem::path> cases()
 {
     const std::filesystem::path directory{std::string{SOURCE_DIR} + "/libs/json/tests/data/JSONTestSuite/test_parsing"};
 
-    std::vector<std::filesystem::path> files;
+    std::vector<std::filesystem::path> files{};
 
     for (const auto& entry : std::filesystem::directory_iterator{directory})
     {
@@ -45,7 +46,7 @@ bool accepts(const std::filesystem::path& file)
     {
         Parser parser{file};
 
-        (void)parser.parse();
+        std::ignore = parser.parse();
 
         return true;
     }
@@ -94,8 +95,8 @@ TEST(Conformance, Every_y_case_is_accepted_and_every_n_case_rejected)
     EXPECT_EQ(implementation_defined, 35U);
 }
 
-// What the parser does on the implementation-defined cases is recorded, not judged: the list is the parser's
-// documented behaviour on them, and a change here is a change of behaviour a release note has to carry.
+// What the parser does on the implementation-defined cases is recorded, not judged: the list is the parser's documented
+// behaviour on them, and a change here is a change of behaviour a release note has to carry.
 TEST(Conformance, The_implementation_defined_cases_behave_as_documented)
 {
     const std::vector<std::string> accepted_i_cases{

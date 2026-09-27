@@ -12,7 +12,11 @@ namespace hopper::parse
  */
 struct Source_position
 {
-    bool operator==(const Source_position&) const = default;
+    /**
+     * @brief Two positions are equal when their fields are.
+     * @return True when equal.
+     */
+    [[nodiscard]] bool operator==(const Source_position&) const = default;
 
     /**
      * @brief The byte offset from the start of the input, counted from zero.
@@ -35,7 +39,11 @@ struct Source_position
  */
 struct Source_span
 {
-    bool operator==(const Source_span&) const = default;
+    /**
+     * @brief Two spans are equal when their fields are.
+     * @return True when equal.
+     */
+    [[nodiscard]] bool operator==(const Source_span&) const = default;
 
     /**
      * @brief The first byte of the construct.

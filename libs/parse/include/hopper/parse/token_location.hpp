@@ -11,8 +11,8 @@ namespace hopper::parse
 /**
  * @brief A position in the input, kept as a line, a column and a byte offset, advanced over consumed text.
  *
- * The offset counts every byte of the input as given, so it indexes the original text on any platform's line
- * endings; the line and column are what a diagnostic prints.
+ * The offset counts every byte of the input as given, so it indexes the original text on any platform's line endings;
+ * the line and column are what a diagnostic prints.
  */
 class Token_location
 {
@@ -54,8 +54,10 @@ public:
     /**
      * @brief Advances over consumed text.
      *
-     * A "\n", a "\r\n" pair and a lone '\r' each end a line: the line count rises by one and the column restarts at
-     * one after it, while the offset counts every byte, so a token spanning lines advances the position exactly.
+     * A "\n", a "\r\n" pair and a lone '\r' each end a line: the line count rises by one and the column restarts at one
+     * after it, while the offset counts every byte, so a token spanning lines advances the position exactly. A pair
+     * split between two calls, the '\r' ending one text and the '\n' beginning the next, ends one line as well, so the
+     * count does not depend on how a lexer divides the input into tokens.
      * @param lexeme The text consumed.
      */
     void advance(std::string_view lexeme) noexcept;
@@ -75,6 +77,11 @@ private:
      * @brief The byte offset from the start of the input, counted from zero.
      */
     std::size_t offset_{0};
+
+    /**
+     * @brief Whether the last byte advanced over was a '\r', whose line a following '\n' completes rather than ends.
+     */
+    bool after_carriage_return_{false};
 };
 
 } // namespace hopper::parse

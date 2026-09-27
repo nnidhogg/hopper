@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -24,18 +25,6 @@ constexpr std::array<std::pair<std::string_view, ast::Type_kind>, 6> types{{
         {"void", ast::Type_kind::Void},
 }};
 
-/**
- * @brief The fundamental type a keyword names.
- * @param word The identifier's spelling.
- * @return The type kind, or std::nullopt when the word names no type.
- */
-[[nodiscard]] std::optional<ast::Type_kind> type_kind_for(const std::string_view word)
-{
-    const auto found{std::ranges::find(types, word, &std::pair<std::string_view, ast::Type_kind>::first)};
-
-    return found != types.end() ? std::optional{found->second} : std::nullopt;
-}
-
 } // namespace
 
 bool Parser::is_declaration_start()
@@ -48,16 +37,16 @@ bool Parser::is_declaration_start()
     const auto token{peek_token()};
 
     return token && token->kind() == Token_kind::Identifier &&
-           (token->lexeme() == "const" || type_kind_for(token->lexeme()).has_value());
+           (token->lexeme() == "const" || lookup(types, token->lexeme()).has_value());
 }
 
 ast::Stmt Parser::parse_declaration_statement()
 {
     const auto begin{here()};
 
-    auto type{parse_type_specifier()};
+    const auto type{parse_type_specifier()};
 
-    std::vector<ast::Declarator> declarators;
+    std::vector<ast::Declarator> declarators{};
 
     declarators.push_back(parse_declarator());
 
@@ -87,7 +76,7 @@ ast::Type Parser::parse_type_specifier()
         eof_error("Expected a type name before end of input");
     }
 
-    const auto kind{token->kind() == Token_kind::Identifier ? type_kind_for(token->lexeme()) : std::nullopt};
+    const auto kind{token->kind() == Token_kind::Identifier ? lookup(types, token->lexeme()) : std::nullopt};
 
     if (!kind)
     {
@@ -101,7 +90,7 @@ ast::Type Parser::parse_type_specifier()
             unexpected("a declarator, not a second 'const'");
         }
 
-        (void)accept_keyword("const");
+        std::ignore = accept_keyword("const");
 
         is_const = true;
     }
@@ -109,16 +98,16 @@ ast::Type Parser::parse_type_specifier()
     return {.is_const = is_const, .kind = *kind};
 }
 
-ast::Type_id Parser::parse_type_id()
+ast::Declarator Parser::parse_declarator()
 {
-    const auto type{parse_type_specifier()};
+    const auto indirection{parse_indirection()};
 
-    const auto [pointers, reference]{parse_indirection()};
+    const auto name{expect_identifier("a declarator name")};
 
-    return {.type = type, .pointers = pointers, .reference = reference};
+    return {.indirection = indirection, .name = std::string{name.lexeme()}, .initializer = parse_initializer()};
 }
 
-Parser::Indirection Parser::parse_indirection()
+ast::Indirection Parser::parse_indirection()
 {
     std::size_t pointers{0};
 
@@ -130,18 +119,6 @@ Parser::Indirection Parser::parse_indirection()
     return {.pointers = pointers, .reference = accept_operator("&")};
 }
 
-ast::Declarator Parser::parse_declarator()
-{
-    const auto [pointers, reference]{parse_indirection()};
-
-    const auto name{expect_identifier("a declarator name")};
-
-    return {.pointers = pointers,
-            .reference = reference,
-            .name = std::string{name.lexeme()},
-            .initializer = parse_initializer()};
-}
-
 std::optional<ast::Expr> Parser::parse_initializer()
 {
     if (!accept_operator("="))
@@ -150,6 +127,13 @@ std::optional<ast::Expr> Parser::parse_initializer()
     }
 
     return parse_assignment();
+}
+
+ast::Type_id Parser::parse_type_id()
+{
+    const auto type{parse_type_specifier()};
+
+    return {.type = type, .indirection = parse_indirection()};
 }
 
 } // namespace hopper::clike

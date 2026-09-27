@@ -10,7 +10,9 @@ namespace hopper::clike
 {
 ast::Translation_unit Parser::parse_translation_unit()
 {
-    ast::Translation_unit unit;
+    pending_.reset();
+
+    ast::Translation_unit unit{};
 
     while (more())
     {
@@ -37,13 +39,10 @@ ast::Translation_unit::Item::Node_t Parser::parse_external_declaration()
         return parse_function(type, indirection, std::string{name.lexeme()});
     }
 
-    std::vector<ast::Declarator> declarators;
+    std::vector<ast::Declarator> declarators{};
 
     declarators.push_back(
-            {.pointers = indirection.pointers,
-             .reference = indirection.reference,
-             .name = std::string{name.lexeme()},
-             .initializer = parse_initializer()});
+            {.indirection = indirection, .name = std::string{name.lexeme()}, .initializer = parse_initializer()});
 
     while (accept_punctuation(','))
     {
@@ -55,11 +54,11 @@ ast::Translation_unit::Item::Node_t Parser::parse_external_declaration()
     return ast::Declaration{.type = type, .declarators = std::move(declarators)};
 }
 
-ast::Function Parser::parse_function(const ast::Type type, const Indirection indirection, std::string name)
+ast::Function Parser::parse_function(const ast::Type type, const ast::Indirection indirection, std::string name)
 {
     expect_punctuation('(', "'(' to open the parameter list");
 
-    std::vector<ast::Parameter> parameters;
+    std::vector<ast::Parameter> parameters{};
 
     if (!check_punctuation(')'))
     {
@@ -74,7 +73,7 @@ ast::Function Parser::parse_function(const ast::Type type, const Indirection ind
     expect_punctuation(')', "')' to close the parameter list");
 
     // A prototype ends here; a definition carries its body, and nothing else tells the two apart.
-    std::unique_ptr<ast::Stmt> body;
+    std::unique_ptr<ast::Stmt> body{};
 
     if (!accept_punctuation(';'))
     {
@@ -82,8 +81,7 @@ ast::Function Parser::parse_function(const ast::Type type, const Indirection ind
     }
 
     return {.return_type = type,
-            .pointers = indirection.pointers,
-            .reference = indirection.reference,
+            .indirection = indirection,
             .name = std::move(name),
             .parameters = std::move(parameters),
             .body = std::move(body)};
@@ -93,20 +91,16 @@ ast::Parameter Parser::parse_parameter()
 {
     const auto type{parse_type_specifier()};
 
-    const auto [pointers, reference]{parse_indirection()};
+    const auto indirection{parse_indirection()};
 
-    std::string name;
+    std::string name{};
 
     if (const auto token{accept_identifier()})
     {
         name = std::string{token->lexeme()};
     }
 
-    return {.type = type,
-            .pointers = pointers,
-            .reference = reference,
-            .name = std::move(name),
-            .default_value = parse_initializer()};
+    return {.type = type, .indirection = indirection, .name = std::move(name), .default_value = parse_initializer()};
 }
 
 } // namespace hopper::clike

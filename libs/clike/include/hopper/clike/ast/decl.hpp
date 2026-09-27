@@ -15,20 +15,15 @@ namespace hopper::clike::ast
  * @brief One declared entity, e.g. `**&name = value` within a declaration.
  *
  * Pointers apply before the reference, so `pointers = 1, reference = true` reads `*&`, a reference to pointer; a
- * pointer to reference is not expressible, exactly as in C++. Rejecting an uninitialized reference is left to a
- * later semantic pass, like other non-syntactic rules.
+ * pointer to reference is not expressible, exactly as in C++. Rejecting an uninitialized reference is left to a later
+ * semantic pass, like other non-syntactic rules.
  */
 struct Declarator
 {
     /**
-     * @brief The pointer depth: one star per level.
+     * @brief The pointer depth and reference bit before the name.
      */
-    std::size_t pointers;
-
-    /**
-     * @brief Whether the declared name is a reference.
-     */
-    bool reference;
+    Indirection indirection;
 
     /**
      * @brief The declared name.

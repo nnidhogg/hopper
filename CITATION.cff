@@ -5,8 +5,8 @@ abstract: >-
   A C++23 library for building recursive-descent parsers over munch lexers: a token stream with one-token lookahead
   and source tracking, structured errors carrying the span they point at, and certified recovery after a lexical
   error under munch's complete-repair invariance. It ships two grammars on that kit, a complete RFC 8259 JSON parser
-  with an explicit stack, held to the JSONTestSuite parsing cases, and a parser for the C-like study grammar the
-  certified-recovery campaign is measured over.
+  with an explicit stack, held to the JSONTestSuite parsing cases, and a parser over the token set the
+  certified-recovery campaign measured.
 keywords:
   - parsing
   - recursive descent

@@ -21,7 +21,7 @@ std::vector<std::pair<Token_kind, std::string>> tokens(const std::string& input)
 {
     hopper::parse::Token_reader<Token_kind> reader{lexer(), input};
 
-    std::vector<std::pair<Token_kind, std::string>> out;
+    std::vector<std::pair<Token_kind, std::string>> out{};
 
     for (;;)
     {
@@ -48,7 +48,7 @@ std::vector<std::pair<Token_kind, std::string>> tokens(const std::string& input)
  */
 std::vector<Token_kind> kinds(const std::string& input)
 {
-    std::vector<Token_kind> out;
+    std::vector<Token_kind> out{};
 
     for (const auto& [kind, lexeme] : tokens(input))
     {
@@ -94,7 +94,7 @@ TEST(Lexer_test, A_line_comment_outranks_the_slash_operator_by_length_and_ends_a
     EXPECT_EQ(listed[8], std::make_pair(Token_kind::Identifier, std::string{"e"}));
 }
 
-TEST(Lexer_test, Strings_have_no_escapes_and_cannot_cross_a_line)
+TEST(Lexer_test, Strings_have_no_escapes_and_exclude_a_line_feed)
 {
     EXPECT_EQ(tokens("\"a\\\"")[0], std::make_pair(Token_kind::String, std::string{"\"a\\\""}));
     EXPECT_EQ(
@@ -111,7 +111,7 @@ TEST(Lexer_test, Numbers_are_digit_runs_and_the_dot_is_punctuation)
     EXPECT_EQ(kinds("0x1F"), (std::vector{Number, Identifier}));
 }
 
-TEST(Lexer_test, A_carriage_return_is_outside_the_grammar)
+TEST(Lexer_test, A_carriage_return_outside_a_string_or_comment_is_rejected)
 {
     EXPECT_TRUE(tokens("a\r\nb")[1].second.starts_with("error:"));
 }

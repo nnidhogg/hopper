@@ -1,9 +1,13 @@
 #include "hopper/clike/parser.hpp"
 
+#include <array>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <type_traits>
+#include <variant>
 
 using namespace hopper::clike;
 
@@ -200,9 +204,9 @@ std::string to_string(const ast::Type_id& type)
 
     result += type_name(type.type.kind);
 
-    result.append(type.pointers, '*');
+    result.append(type.indirection.pointers, '*');
 
-    if (type.reference)
+    if (type.indirection.reference)
     {
         result += '&';
     }
@@ -210,8 +214,8 @@ std::string to_string(const ast::Type_id& type)
     return result;
 }
 
-// Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly
-// in the expected string rather than in a deeply nested chain of std::get<> assertions.
+// Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly in the
+// expected string rather than in a deeply nested chain of std::get<> assertions.
 /**
  * @brief An expression printed with every operation parenthesized, so the tree's shape is visible.
  */
@@ -247,7 +251,7 @@ std::string to_string(const ast::Expr& expr)
                 }
                 else if constexpr (std::is_same_v<Node_t, ast::Call>)
                 {
-                    std::string arguments;
+                    std::string arguments{};
 
                     for (const auto& argument : node.arguments)
                     {
@@ -320,12 +324,12 @@ std::string type_name(const ast::Type& type)
  */
 std::string to_string(const ast::Declaration& declaration)
 {
-    std::string declarators;
+    std::string declarators{};
 
     for (const auto& declarator : declaration.declarators)
     {
-        declarators += (declarators.empty() ? "" : ",") + std::string(declarator.pointers, '*') +
-                       (declarator.reference ? "&" : "") + declarator.name +
+        declarators += (declarators.empty() ? "" : ",") + std::string(declarator.indirection.pointers, '*') +
+                       (declarator.indirection.reference ? "&" : "") + declarator.name +
                        (declarator.initializer ? "=" + to_string(*declarator.initializer) : "");
     }
 
@@ -353,7 +357,7 @@ std::string to_string(const ast::Stmt& stmt)
                 }
                 else if constexpr (std::is_same_v<Node_t, ast::Compound>)
                 {
-                    std::string statements;
+                    std::string statements{};
 
                     for (const auto& statement : node.statements)
                     {
@@ -401,8 +405,8 @@ std::string to_string(const ast::Stmt& stmt)
 std::string to_string(const ast::Parameter& parameter)
 {
     const auto declarator{
-            std::string(parameter.pointers, '*') + (parameter.reference ? "&" : "") + parameter.name +
-            (parameter.default_value ? "=" + to_string(*parameter.default_value) : "")};
+            std::string(parameter.indirection.pointers, '*') + (parameter.indirection.reference ? "&" : "") +
+            parameter.name + (parameter.default_value ? "=" + to_string(*parameter.default_value) : "")};
 
     return declarator.empty() ? type_name(parameter.type) : type_name(parameter.type) + " " + declarator;
 }
@@ -412,15 +416,15 @@ std::string to_string(const ast::Parameter& parameter)
  */
 std::string to_string(const ast::Function& function)
 {
-    std::string parameters;
+    std::string parameters{};
 
     for (const auto& parameter : function.parameters)
     {
         parameters += (parameters.empty() ? "" : ",") + to_string(parameter);
     }
 
-    return type_name(function.return_type) + " " + std::string(function.pointers, '*') +
-           (function.reference ? "&" : "") + function.name + "(" + parameters + ")" +
+    return type_name(function.return_type) + " " + std::string(function.indirection.pointers, '*') +
+           (function.indirection.reference ? "&" : "") + function.name + "(" + parameters + ")" +
            (function.body ? to_string(*function.body) : ";");
 }
 
@@ -429,7 +433,7 @@ std::string to_string(const ast::Function& function)
  */
 std::string to_string(const ast::Translation_unit& unit)
 {
-    std::string items;
+    std::string items{};
 
     for (const auto& item : unit.items)
     {
@@ -478,8 +482,18 @@ ast::Translation_unit parse_unit(const std::string& input)
 class Expr_generator
 {
 public:
+    /**
+     * @brief Seeds the generator; the same seed yields the same trees.
+     * @param seed The seed.
+     */
     explicit Expr_generator(const unsigned seed) : seed_{seed} {}
 
+    /**
+     * @brief A random expression tree of at most a depth, every node kind reachable but Postfix and String_literal,
+     *        which their own tests hold.
+     * @param depth How deep the tree may nest.
+     * @return The tree.
+     */
     ast::Expr expression(const int depth)
     {
         if (depth == 0 || next() % 4 == 0)
@@ -491,23 +505,22 @@ public:
         {
         case 0:
         {
-            constexpr ast::Binary_op ops[]{ast::Binary_op::Add,         ast::Binary_op::Subtract,
-                                           ast::Binary_op::Multiply,    ast::Binary_op::Less,
-                                           ast::Binary_op::Equal,       ast::Binary_op::Shift_left,
-                                           ast::Binary_op::Bitwise_and, ast::Binary_op::Logical_or};
+            constexpr std::array ops{ast::Binary_op::Add,         ast::Binary_op::Subtract,  ast::Binary_op::Multiply,
+                                     ast::Binary_op::Less,        ast::Binary_op::Equal,     ast::Binary_op::Shift_left,
+                                     ast::Binary_op::Bitwise_and, ast::Binary_op::Logical_or};
 
             return wrap(ast::Binary{
-                    .op = ops[next() % 8],
+                    .op = ops[next() % ops.size()],
                     .lhs = boxed(expression(depth - 1)),
                     .rhs = boxed(expression(depth - 1))});
         }
         case 1:
         {
-            constexpr ast::Unary_op ops[]{
+            constexpr std::array ops{
                     ast::Unary_op::Minus, ast::Unary_op::Not, ast::Unary_op::Bitwise_not, ast::Unary_op::Dereference,
                     ast::Unary_op::Address_of};
 
-            return wrap(ast::Unary{.op = ops[next() % 5], .operand = boxed(expression(depth - 1))});
+            return wrap(ast::Unary{.op = ops[next() % ops.size()], .operand = boxed(expression(depth - 1))});
         }
         case 2:
             return wrap(ast::Ternary{
@@ -516,7 +529,7 @@ public:
                     .else_branch = boxed(expression(depth - 1))});
         case 3:
         {
-            std::vector<ast::Expr> arguments;
+            std::vector<ast::Expr> arguments{};
 
             for (auto count{next() % 3}; count > 0; --count)
             {
@@ -529,23 +542,22 @@ public:
             return wrap(ast::Member{
                     .op = next() % 2 == 0 ? ast::Member_op::Dot : ast::Member_op::Arrow,
                     .object = boxed(expression(depth - 1)),
-                    .member = identifiers_[next() % 4]});
+                    .member = std::string{identifiers[next() % identifiers.size()]}});
         case 5:
             return wrap(ast::Subscript{.object = boxed(expression(depth - 1)), .index = boxed(expression(depth - 1))});
         case 6:
         {
-            constexpr ast::Cast_kind kinds[]{
+            constexpr std::array kinds{
                     ast::Cast_kind::Static, ast::Cast_kind::Dynamic, ast::Cast_kind::Const,
                     ast::Cast_kind::Reinterpret};
 
-            constexpr ast::Type_kind types[]{ast::Type_kind::Char, ast::Type_kind::Int, ast::Type_kind::Double};
+            constexpr std::array types{ast::Type_kind::Char, ast::Type_kind::Int, ast::Type_kind::Double};
 
             return wrap(ast::Cast{
-                    .kind = kinds[next() % 4],
+                    .kind = kinds[next() % kinds.size()],
                     .type =
-                            {.type = {.is_const = next() % 2 == 0, .kind = types[next() % 3]},
-                             .pointers = next() % 3,
-                             .reference = next() % 2 == 0},
+                            {.type = {.is_const = next() % 2 == 0, .kind = types[next() % types.size()]},
+                             .indirection = {.pointers = next() % 3, .reference = next() % 2 == 0}},
                     .operand = boxed(expression(depth - 1))});
         }
         default:
@@ -557,14 +569,36 @@ public:
     }
 
 private:
+    /**
+     * @brief The next draw of a linear congruential sequence, its high bits.
+     * @return The draw.
+     */
     unsigned next() { return seed_ = seed_ * 1664525U + 1013904223U, seed_ >> 16U; }
 
+    /**
+     * @brief An expression holding a node.
+     * @param node The node.
+     * @return The expression.
+     */
     static ast::Expr wrap(auto node) { return {.node = std::move(node)}; }
 
+    /**
+     * @brief An expression moved onto the heap, as a child.
+     * @param expr The expression.
+     * @return The owning pointer.
+     */
     static std::unique_ptr<ast::Expr> boxed(ast::Expr expr) { return std::make_unique<ast::Expr>(std::move(expr)); }
 
-    ast::Expr name() { return wrap(ast::Name{.identifier = identifiers_[next() % 4]}); }
+    /**
+     * @brief A name expression over one of four identifiers.
+     * @return The expression.
+     */
+    ast::Expr name() { return wrap(ast::Name{.identifier = std::string{identifiers[next() % identifiers.size()]}}); }
 
+    /**
+     * @brief A leaf: an integer literal, a boolean literal or a name.
+     * @return The leaf.
+     */
     ast::Expr leaf()
     {
         switch (next() % 3)
@@ -578,9 +612,15 @@ private:
         }
     }
 
-    unsigned seed_;
+    /**
+     * @brief The generator's state.
+     */
+    unsigned seed_{};
 
-    const char* identifiers_[4]{"alpha", "beta", "gamma", "delta"};
+    /**
+     * @brief The identifiers a name draws from.
+     */
+    static constexpr std::array<std::string_view, 4> identifiers{"alpha", "beta", "gamma", "delta"};
 };
 
 } // namespace
@@ -654,8 +694,8 @@ TEST(Parser_test, Unary_operators)
 
 TEST(Parser_test, Unary_chains)
 {
-    // A space is required: "--5" is one Minus_minus token via maximal munch (see Maximal_munch_prefers_the_longest_
-    // operator_token below), not two Minus tokens.
+    // A space is required: "--5" is the decrement operator, the parser fusing the two adjacent operator bytes into the
+    // longest spelling it knows (see Maximal_munch_prefers_the_longest_operator_token below), not two negations.
     EXPECT_EQ(to_string(parse("- -5")), "(-(-5))");
     EXPECT_EQ(to_string(parse("!!true")), "(!(!true))");
 }
@@ -667,9 +707,10 @@ TEST(Parser_test, Unary_binds_tighter_than_multiplicative)
 
 TEST(Parser_test, Maximal_munch_prefers_the_longest_operator_token)
 {
-    // "--5" lexes as a single Minus_minus token followed by "5", exactly as in real C++ (where this is the classic
-    // reason "a---b" means "a-- -b", not "a - --b"). With prefix decrement in the grammar it therefore parses as
-    // one prefix operator, not as two nested negations; the spaced spelling still yields the negations.
+    // "--5" reads as the decrement operator followed by "5": the lexer emits two one-byte operator tokens and the
+    // parser fuses them into the longest operator spelling, exactly as in real C++ (where this is the classic reason
+    // "a---b" means "a-- -b", not "a - --b"). With prefix decrement in the grammar it therefore parses as one prefix
+    // operator, not as two nested negations; the spaced spelling still yields the negations.
     EXPECT_EQ(to_string(parse("--5")), "(--5)");
     EXPECT_EQ(to_string(parse("- -5")), "(-(-5))");
 }
@@ -768,23 +809,23 @@ TEST(Parser_test, Mixed_postfix_chain)
 
 TEST(Parser_test, Throws_on_unclosed_call)
 {
-    EXPECT_THROW(parse("f(1, 2"), std::runtime_error);
+    EXPECT_THROW(parse("f(1, 2"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_missing_argument_after_comma)
 {
-    EXPECT_THROW(parse("f(1,)"), std::runtime_error);
+    EXPECT_THROW(parse("f(1,)"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_unclosed_subscript)
 {
-    EXPECT_THROW(parse("array[0"), std::runtime_error);
+    EXPECT_THROW(parse("array[0"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_missing_member_name)
 {
-    EXPECT_THROW(parse("object."), std::runtime_error);
-    EXPECT_THROW(parse("object.1"), std::runtime_error);
+    EXPECT_THROW(parse("object."), hopper::parse::Parse_error);
+    EXPECT_THROW(parse("object.1"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Relational_and_equality)
@@ -950,7 +991,7 @@ TEST(Parser_test, Assignment_in_parentheses)
 
 TEST(Parser_test, Throws_on_missing_assignment_value)
 {
-    EXPECT_THROW(parse("x ="), std::runtime_error);
+    EXPECT_THROW(parse("x ="), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Full_precedence_chain)
@@ -960,32 +1001,32 @@ TEST(Parser_test, Full_precedence_chain)
 
 TEST(Parser_test, Throws_on_lexical_error)
 {
-    EXPECT_THROW(parse("1 @ 2"), std::runtime_error);
+    EXPECT_THROW(parse("1 @ 2"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_missing_operand)
 {
-    EXPECT_THROW(parse("1 +"), std::runtime_error);
+    EXPECT_THROW(parse("1 +"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_unclosed_parenthesis)
 {
-    EXPECT_THROW(parse("(1 + 2"), std::runtime_error);
+    EXPECT_THROW(parse("(1 + 2"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_trailing_input)
 {
-    EXPECT_THROW(parse("1 2"), std::runtime_error);
+    EXPECT_THROW(parse("1 2"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_empty_input)
 {
-    EXPECT_THROW(parse(""), std::runtime_error);
+    EXPECT_THROW(parse(""), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_missing_ternary_colon)
 {
-    EXPECT_THROW(parse("true ? 1"), std::runtime_error);
+    EXPECT_THROW(parse("true ? 1"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Expression_statement)
@@ -1042,41 +1083,41 @@ TEST(Parser_test, Statements_compose)
 
 TEST(Parser_test, Throws_on_missing_statement_semicolon)
 {
-    EXPECT_THROW(parse_stmt("x = 1"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("return x"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("x = 1"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("return x"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_unclosed_block)
 {
-    EXPECT_THROW(parse_stmt("{ x;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("{ x;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_malformed_if)
 {
-    EXPECT_THROW(parse_stmt("if a) b;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("if (a) b"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("if (a)"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("if a) b;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("if (a) b"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("if (a)"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_lone_else)
 {
-    EXPECT_THROW(parse_stmt("else x;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("else x;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_trailing_statement_input)
 {
-    EXPECT_THROW(parse_stmt("x; y;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("x; y;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_empty_statement_input)
 {
-    EXPECT_THROW(parse_stmt(""), std::runtime_error);
+    EXPECT_THROW(parse_stmt(""), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_when_a_keyword_is_used_as_an_expression)
 {
-    EXPECT_THROW(parse_stmt("x = if;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("while;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("x = if;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("while;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Declaration_of_a_single_variable)
@@ -1116,7 +1157,7 @@ TEST(Parser_test, Declaration_const_placement)
 {
     EXPECT_EQ(to_string(parse_stmt("const int x = 1;")), "const int x=1;");
     EXPECT_EQ(to_string(parse_stmt("int const x = 1;")), "const int x=1;");
-    EXPECT_THROW(parse_stmt("const int const x;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("const int const x;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Declaration_initializer_commas_belong_to_the_call)
@@ -1132,12 +1173,12 @@ TEST(Parser_test, Declarations_inside_blocks)
 
 TEST(Parser_test, Throws_on_malformed_declarations)
 {
-    EXPECT_THROW(parse_stmt("int;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("int x"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("int x = ;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("int 5;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("int x,;"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("const x;"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("int x"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("int x = ;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("int 5;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("int x,;"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("const x;"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, For_with_declaration_init)
@@ -1185,17 +1226,17 @@ TEST(Parser_test, Do_while_with_block_body)
 
 TEST(Parser_test, Throws_on_malformed_for)
 {
-    EXPECT_THROW(parse_stmt("for () f();"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("for (int i = 0) f();"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("for (;; f();"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("for (;;)"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("for () f();"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("for (int i = 0) f();"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("for (;; f();"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("for (;;)"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Throws_on_malformed_do_while)
 {
-    EXPECT_THROW(parse_stmt("do f();"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("do f(); while (x)"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("do while (x);"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("do f();"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("do f(); while (x)"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("do while (x);"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Function_definition)
@@ -1252,12 +1293,12 @@ TEST(Parser_test, Function_bodies_use_the_full_statement_grammar)
 
 TEST(Parser_test, Throws_on_malformed_functions)
 {
-    EXPECT_THROW(parse_unit("int f("), std::runtime_error);
-    EXPECT_THROW(parse_unit("int f()"), std::runtime_error);
-    EXPECT_THROW(parse_unit("int f(x);"), std::runtime_error);
-    EXPECT_THROW(parse_unit("int f(int a { return a; }"), std::runtime_error);
-    EXPECT_THROW(parse_unit("int f() { return 0; } }"), std::runtime_error);
-    EXPECT_THROW(parse_unit(";"), std::runtime_error);
+    EXPECT_THROW(parse_unit("int f("), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_unit("int f()"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_unit("int f(x);"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_unit("int f(int a { return a; }"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_unit("int f() { return 0; } }"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_unit(";"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Prefix_increment_and_decrement)
@@ -1303,8 +1344,8 @@ TEST(Parser_test, String_literals_hold_their_bytes_as_written)
     EXPECT_EQ(to_string(parse("\"\"")), "\"\"");
     EXPECT_EQ(to_string(parse("\"a\\b\"")), "\"a\\b\"");
     EXPECT_EQ(to_string(parse("f(\"x\", 1)")), "f(\"x\",1)");
-    EXPECT_THROW(parse("\"abc"), std::runtime_error);
-    EXPECT_THROW(parse("\"a\nb\""), std::runtime_error);
+    EXPECT_THROW(parse("\"abc"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse("\"a\nb\""), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Multi_byte_operators_are_fused_from_adjacent_operator_bytes_only)
@@ -1314,14 +1355,14 @@ TEST(Parser_test, Multi_byte_operators_are_fused_from_adjacent_operator_bytes_on
     EXPECT_EQ(to_string(parse("a-- - b")), "((a--)-b)");
     EXPECT_EQ(to_string(parse("p->q")), "(p->q)");
     EXPECT_EQ(to_string(parse("a < -b")), "(a<(-b))");
-    EXPECT_THROW(parse("a < <b"), std::runtime_error);
-    EXPECT_THROW(parse("a = = b"), std::runtime_error);
+    EXPECT_THROW(parse("a < <b"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse("a = = b"), hopper::parse::Parse_error);
 }
 
 TEST(Parser_test, Keywords_are_reserved_identifiers)
 {
-    EXPECT_THROW(parse("if"), std::runtime_error);
-    EXPECT_THROW(parse_stmt("int while = 1;"), std::runtime_error);
+    EXPECT_THROW(parse("if"), hopper::parse::Parse_error);
+    EXPECT_THROW(parse_stmt("int while = 1;"), hopper::parse::Parse_error);
     EXPECT_EQ(to_string(parse("iff + whiles")), "(iff+whiles)");
 }
 
@@ -1370,6 +1411,43 @@ TEST(Parser_test, Statement_spans_skip_leading_trivia)
     EXPECT_EQ(stmt.span.end.offset, 8U);
 }
 
+TEST(Parser_test, Spans_stop_before_trailing_trivia)
+{
+    EXPECT_EQ(parse("1+2 ").span.end.offset, 3U);
+    EXPECT_EQ(parse("-a ").span.end.offset, 2U);
+    EXPECT_EQ(parse_stmt("if(a);  ").span.end.offset, 6U);
+}
+
+TEST(Parser_test, A_reload_leaves_no_operator_of_the_old_input)
+{
+    Parser parser{std::string{"1 ~"}};
+
+    EXPECT_THROW(std::ignore = parser.parse_expression(), hopper::parse::Parse_error);
+
+    parser.load(std::string{"2"});
+
+    const auto expr{parser.parse_expression()};
+
+    EXPECT_TRUE(std::holds_alternative<ast::Int_literal>(expr.node));
+    EXPECT_EQ(expr.span.begin.offset, 0U);
+    EXPECT_EQ(expr.span.end.offset, 1U);
+}
+
+TEST(Parser_test, An_out_of_range_integer_is_an_invalid_literal)
+{
+    try
+    {
+        std::ignore = parse("9223372036854775808");
+
+        FAIL() << "an integer past long long should not parse";
+    }
+    catch (const hopper::parse::Parse_error& error)
+    {
+        EXPECT_EQ(error.kind(), hopper::parse::Parse_error_kind::Invalid_literal);
+        EXPECT_EQ(error.span().end.offset, 19U);
+    }
+}
+
 TEST(Parser_test, Item_spans_follow_source_order_across_lines)
 {
     const auto unit{parse_unit("int a = 1;\nint b = 2;")};
@@ -1401,9 +1479,9 @@ TEST(Parser_test, Block_spans_cover_their_braces)
 
 TEST(Parser_test, Generated_expressions_round_trip_through_print_and_reparse)
 {
-    // The renderer prints every construct fully parenthesized, so its output is unambiguous source; parsing it
-    // back and printing again must reproduce the text exactly. This exercises operator and shape combinations no
-    // hand-written example covers, in the same spirit as munch's differential tests.
+    // The renderer prints every construct fully parenthesized, so its output is unambiguous source; parsing it back and
+    // printing again must reproduce the text exactly. This exercises operator and shape combinations no hand-written
+    // example covers, in the same spirit as munch's differential tests.
     Expr_generator generator{12345};
 
     for (int index{0}; index < 200; ++index)
@@ -1440,16 +1518,16 @@ TEST(Parser_test, One_parser_serves_many_inputs)
 
 TEST(Parser_test, Parses_each_named_cast)
 {
-    const std::pair<const char*, ast::Cast_kind> casts[]{
+    const std::array<std::pair<std::string_view, ast::Cast_kind>, 4> casts{{
             {"static_cast<int>(x)", ast::Cast_kind::Static},
             {"dynamic_cast<int>(x)", ast::Cast_kind::Dynamic},
             {"const_cast<int>(x)", ast::Cast_kind::Const},
             {"reinterpret_cast<int>(x)", ast::Cast_kind::Reinterpret},
-    };
+    }};
 
     for (const auto& [source, kind] : casts)
     {
-        const auto expression{parse(source)};
+        const auto expression{parse(std::string{source})};
 
         const auto& cast{std::get<ast::Cast>(expression.node)};
 
@@ -1467,8 +1545,8 @@ TEST(Parser_test, Parses_the_cast_type_shape)
 
     EXPECT_TRUE(cast.type.type.is_const);
     EXPECT_EQ(cast.type.type.kind, ast::Type_kind::Char);
-    EXPECT_EQ(cast.type.pointers, 2U);
-    EXPECT_TRUE(cast.type.reference);
+    EXPECT_EQ(cast.type.indirection.pointers, 2U);
+    EXPECT_TRUE(cast.type.indirection.reference);
 }
 
 TEST(Parser_test, Casts_chain_with_postfix_operators)
@@ -1488,8 +1566,30 @@ TEST(Parser_test, Cast_spans_cover_keyword_to_closing_paren)
 
 TEST(Parser_test, Malformed_casts_are_syntax_errors)
 {
-    EXPECT_THROW(static_cast<void>(parse("static_cast int>(x)")), hopper::parse::Parse_error);
-    EXPECT_THROW(static_cast<void>(parse("static_cast<int>x")), hopper::parse::Parse_error);
-    EXPECT_THROW(static_cast<void>(parse("static_cast<>(x)")), hopper::parse::Parse_error);
-    EXPECT_THROW(static_cast<void>(parse("static_cast<int>(x")), hopper::parse::Parse_error);
+    EXPECT_THROW(std::ignore = parse("static_cast int>(x)"), hopper::parse::Parse_error);
+    EXPECT_THROW(std::ignore = parse("static_cast<int>x"), hopper::parse::Parse_error);
+    EXPECT_THROW(std::ignore = parse("static_cast<>(x)"), hopper::parse::Parse_error);
+    EXPECT_THROW(std::ignore = parse("static_cast<int>(x"), hopper::parse::Parse_error);
+}
+
+TEST(Parser_test, Recover_moves_past_a_lexical_error_to_a_certified_start_and_parses_the_remainder)
+{
+    // The hash matches no token. munch certifies the newline as a token start, the three bytes before it its evidence,
+    // so the second line parses as a unit of its own after the recovery; the damaged declaration is what the error
+    // cost.
+    Parser parser{std::string{"int a = 1; # int b = 2;\nint c = 3;"}};
+
+    EXPECT_THROW(std::ignore = parser.parse_translation_unit(), hopper::parse::Parse_error);
+
+    const auto answer{parser.recover()};
+
+    ASSERT_TRUE(answer.has_value());
+    EXPECT_EQ(answer->start, 23U);
+    EXPECT_EQ(answer->evidence_begin, 20U);
+    EXPECT_TRUE(answer->window);
+
+    const auto unit{parser.parse_translation_unit()};
+
+    ASSERT_EQ(unit.items.size(), 1U);
+    EXPECT_EQ(std::get<ast::Declaration>(unit.items.front().node).declarators.front().name, "c");
 }

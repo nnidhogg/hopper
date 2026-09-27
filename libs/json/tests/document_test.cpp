@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <random>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace
@@ -65,6 +66,8 @@ std::string generate(std::mt19937& random, const int depth)
     }
 }
 
+} // namespace
+
 TEST(Document, The_stream_covers_the_text_and_matches_a_whole_scan_after_each_edit)
 {
     std::mt19937 random{20260907};
@@ -101,8 +104,8 @@ TEST(Document, The_stream_covers_the_text_and_matches_a_whole_scan_after_each_ed
             EXPECT_EQ(document.tokens(), reference.tokens()) << "round " << round << " step " << step;
             EXPECT_EQ(document.complete(), reference.complete());
 
-            // The saving is measured over edits that keep the text tokenizable; a text that stops tokenizing is
-            // relexed whole by contract until it tokenizes again.
+            // The saving is measured over edits that keep the text tokenizable; a text that stops tokenizing is relexed
+            // whole by contract until it tokenizes again.
             if (complete_before && reference.complete())
             {
                 ++edits;
@@ -112,8 +115,8 @@ TEST(Document, The_stream_covers_the_text_and_matches_a_whole_scan_after_each_ed
         }
     }
 
-    // Small generated documents certify little, so the saving here is only that some edits stay local; how much a
-    // real document saves is measured in docs/design.md.
+    // Small generated documents certify little, so the saving here is only that some edits stay local; how much a real
+    // document saves is measured in docs/design.md.
     EXPECT_GT(edits, 0U);
     EXPECT_LT(whole_relexes, edits) << "whole relexes " << whole_relexes << " of " << edits;
     EXPECT_GT(rescanned, 0U);
@@ -139,6 +142,7 @@ TEST(Document, An_edit_that_breaks_tokenization_falls_back_to_the_whole_text_and
 
     EXPECT_TRUE(broken.whole);
     EXPECT_FALSE(document.complete());
+    EXPECT_EQ(broken.rescanned, 4U);
 
     const auto repaired{document.edit(5, 1, "")};
 
@@ -151,8 +155,6 @@ TEST(Document, Ranges_outside_the_text_are_refused)
 {
     Document document{"[1]"};
 
-    EXPECT_THROW((void)document.edit(4, 0, ""), std::out_of_range);
-    EXPECT_THROW((void)document.edit(2, 5, ""), std::out_of_range);
+    EXPECT_THROW(std::ignore = document.edit(4, 0, ""), std::out_of_range);
+    EXPECT_THROW(std::ignore = document.edit(2, 5, ""), std::out_of_range);
 }
-
-} // namespace

@@ -1,9 +1,12 @@
 #include "hopper/clike/parser.hpp"
 
+#include <algorithm>
 #include <array>
+#include <string>
+#include <string_view>
+#include <tuple>
 #include <utility>
 
-#include "hopper/clike/binary_operator.hpp"
 #include "hopper/parse/parse_error.hpp"
 
 namespace hopper::clike
@@ -40,26 +43,39 @@ constexpr std::array<std::string_view, 19> keywords{"true",
  */
 bool is_keyword(const std::string_view spelling) noexcept
 {
-    for (const auto keyword : keywords)
-    {
-        if (keyword == spelling)
-        {
-            return true;
-        }
-    }
+    return std::ranges::contains(keywords, spelling);
+}
 
-    return false;
+/**
+ * @brief Every operator spelling the language knows, the ones the parser fuses from adjacent operator bytes.
+ */
+constexpr std::array<std::string_view, 34> operators{
+        "+",  "-",  "*",  "/",  "%",  "<",  ">",  "=",  "!",  "&",  "|",  "^",  "~",  "++", "--", "==",  "!=",
+        "<=", ">=", "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "->", "<<=", ">>="};
+
+/**
+ * @brief Whether a spelling is a prefix of an operator the language knows, itself included.
+ *
+ * The parser fuses adjacent operator bytes while this holds, so the fused spelling is always the longest operator the
+ * bytes begin, as a C lexer would read them.
+ * @param spelling The candidate spelling.
+ * @return True when some operator starts with it.
+ */
+bool is_operator_prefix(const std::string_view spelling) noexcept
+{
+    return std::ranges::any_of(
+            operators, [spelling](const std::string_view candidate) { return candidate.starts_with(spelling); });
 }
 
 } // namespace
 
-Parser::Parser(Token_reader_t reader) : Parser_base{std::move(reader)}
+Parser::Parser(Reader_t reader) : Parser_base{std::move(reader)}
 {}
 
-Parser::Parser(const std::string& input) : Parser{Token_reader_t{lexer(), input, &is_trivia}}
+Parser::Parser(const std::string& input) : Parser_base{lexer(), input, is_trivia}
 {}
 
-Parser::Parser(const std::filesystem::path& file) : Parser{Token_reader_t{lexer(), file, &is_trivia}}
+Parser::Parser(const std::filesystem::path& file) : Parser_base{lexer(), file, is_trivia}
 {}
 
 parse::Source_position Parser::here()
@@ -102,7 +118,7 @@ std::optional<Parser::Operator> Parser::peek_operator()
             break;
         }
 
-        (void)next_token();
+        std::ignore = next_token();
 
         spelling = candidate;
 
@@ -146,6 +162,18 @@ void Parser::expect_operator(const std::string_view spelling, const std::string_
     }
 }
 
+void Parser::unexpected(const std::string_view what)
+{
+    if (pending_)
+    {
+        throw parse::Parse_error{
+                parse::Parse_error_kind::Unexpected_token, pending_->span,
+                "Syntax error: Expected " + std::string(what) + ", got '" + pending_->spelling + "'"};
+    }
+
+    syntax_error("Expected " + std::string(what), require(what));
+}
+
 bool Parser::check_punctuation(const char byte)
 {
     if (pending_)
@@ -165,7 +193,7 @@ bool Parser::accept_punctuation(const char byte)
         return false;
     }
 
-    (void)next_token();
+    std::ignore = next_token();
 
     return true;
 }
@@ -197,7 +225,7 @@ bool Parser::accept_keyword(const std::string_view word)
         return false;
     }
 
-    (void)next_token();
+    std::ignore = next_token();
 
     return true;
 }
@@ -242,25 +270,6 @@ Parser::Token_t Parser::expect_identifier(const std::string_view what)
 bool Parser::more()
 {
     return pending_.has_value() || peek_token().has_value();
-}
-
-void Parser::unexpected(const std::string_view what)
-{
-    if (pending_)
-    {
-        throw parse::Parse_error{
-                parse::Parse_error_kind::Unexpected_token, pending_->span,
-                "Syntax error: Expected " + std::string(what) + ", got '" + pending_->spelling + "'"};
-    }
-
-    const auto token{next_token()};
-
-    if (!token)
-    {
-        eof_error("Expected " + std::string(what) + " before end of input");
-    }
-
-    syntax_error("Expected " + std::string(what), *token);
 }
 
 } // namespace hopper::clike
