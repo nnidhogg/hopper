@@ -56,8 +56,8 @@ about its own state there is a question this library asks and does not answer; s
 - **Edits that relex only what they reach.** `json::Document` keeps a text and its token stream and brings the stream
   current after an edit by rescanning from a certified token start close before it, found by a bounded search, to the
   first boundary after it that the old stream shared, or by relexing the whole text when that search finds no certified
-  start or the text does not tokenize, the edit theorem of the certified-splitting report as a type; every edit reports
-  how many bytes its scan covered.
+  start or the text does not tokenize, the edit theorem of the certified-splitting report,
+  [arXiv:2610.08854](https://arxiv.org/abs/2610.08854), as a type; every edit reports how many bytes its scan covered.
 - **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over the campaign's
   seven token kinds; its language is decimal integers, strings without escapes, booleans, the C operator ladder with
   assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types with
