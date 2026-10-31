@@ -39,7 +39,7 @@ precision; strings are unescaped to UTF-8 with surrogate pairs combined and a lo
 literal; objects keep their members in document order, duplicates included, and answer a lookup with the last member of
 a name, as most processors do. The lexer's string interior is built from munch's UTF-8 code point ranges, so a string
 whose bytes are not well-formed UTF-8 never tokenizes. The parser is held to every accepted and rejected case of the
-JSONTestSuite, and its behaviour on the implementation-defined cases is recorded as a test rather than left to drift.
+JSONTestSuite, and its behavior on the implementation-defined cases is recorded as a test rather than left to drift.
 
 **The C-like study grammar** is the second grammar because it is what the papers measured. Its token set is exactly the
 recovery campaign's row "c-like conventional with strings and line comments": an identifier, a digit run, one operator

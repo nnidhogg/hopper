@@ -107,7 +107,7 @@ if (HOPPER_INSTALL)
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
     # The JSONTestSuite notice accompanies copies of the test data, which the install does not carry; the notice
-    # travels anyway so the package's licences are complete on their own.
+    # travels anyway so the package's licenses are complete on their own.
     install(FILES LICENSE THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/hopper)
 
     install(EXPORT hopper_targets

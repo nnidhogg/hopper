@@ -96,7 +96,7 @@ TEST(Conformance, Every_y_case_is_accepted_and_every_n_case_rejected)
 }
 
 // What the parser does on the implementation-defined cases is recorded, not judged: the list is the parser's documented
-// behaviour on them, and a change here is a change of behaviour a release note has to carry.
+// behavior on them, and a change here is a change of behavior a release note has to carry.
 TEST(Conformance, The_implementation_defined_cases_behave_as_documented)
 {
     const std::vector<std::string> accepted_i_cases{

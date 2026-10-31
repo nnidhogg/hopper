@@ -149,7 +149,7 @@ ctest --output-on-failure
 ```
 
 The JSON suite includes the 318 parsing cases of the JSONTestSuite, vendored under `libs/json/tests/data/JSONTestSuite/`
-with their licence and provenance: every `y_` case must parse, every `n_` case must be refused, and what the parser does
+with their license and provenance: every `y_` case must parse, every `n_` case must be refused, and what the parser does
 on the `i_` cases is asserted rather than left to drift. Tests and warnings-as-errors are enabled by default only when
 hopper is the top-level project; a build consuming hopper through `add_subdirectory` opts in with
 `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`. The probe under `tools/probes/` is a self-checking executable

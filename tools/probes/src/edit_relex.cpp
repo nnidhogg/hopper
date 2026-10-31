@@ -193,7 +193,7 @@ std::optional<Edit> edit_for(const std::string& text, const Piece& token, const 
     }
     case 2:
     {
-        // One ASCII byte deleted inside a string without escapes, its neighbours ASCII too.
+        // One ASCII byte deleted inside a string without escapes, its neighbors ASCII too.
         if (!plain_string(text, token) || token.length < 4)
         {
             return std::nullopt;
